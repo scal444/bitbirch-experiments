@@ -34,8 +34,9 @@ just the molecules in the 20 and 50 largest clusters.
    bash scripts/run/run_quality_all.sh   # labels, quality metrics, MoleculeACE, refinement
    bash scripts/run/run_timings.sh       # time and peak memory; use an otherwise idle machine
    ```
-   Each takes many hours at full size. Both take stage names to run only part, and skip outputs that already
-   exist. Stages and single-run commands: [`scripts/README.md`](scripts/README.md).
+   Each takes many hours at full size. Both take stage names to run only part. The quality script skips outputs
+   that already exist; the timing script appends a row per run. Stages and single-run commands:
+   [`scripts/README.md`](scripts/README.md).
 4. **Plot.** `python scripts/plot/make_all.py` writes all figures (PNG) and `plots/INDEX.md`. It only reads the
    tables under `data/`, so it can redraw any results folder's figures without the fingerprints or a GPU.
 
