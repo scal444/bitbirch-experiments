@@ -2,7 +2,7 @@ player,scope,points,sizes,time_exponent,memory_exponent
 batched,zinc_10m_101m,4,zinc10m zinc25m zinc50m zinc101m,0.9589460072623558,0.8513505041707151
 batched,all_sizes,7,ena1m chembl34 zinc10m ena10m zinc25m zinc50m zinc101m,0.8960119140694747,0.6533332166371407
 multiround,zinc_10m_101m,4,zinc10m zinc25m zinc50m zinc101m,0.6072592643801819,0.5262748275783972
-multiround,all_sizes,7,ena1m chembl34 zinc10m ena10m zinc25m zinc50m zinc101m,0.5371654147273892,0.4062139872525967
+multiround,all_sizes,7,ena1m chembl34 zinc10m ena10m zinc25m zinc50m zinc101m,0.5371359519117969,0.44788739668874494
 nvmolkit,zinc_10m_101m,4,zinc10m zinc25m zinc50m zinc101m,0.8895224279150794,0.7225795005569664
 nvmolkit,all_sizes,7,ena1m chembl34 zinc10m ena10m zinc25m zinc50m zinc101m,0.6922552186996989,0.5433226020714005
 serial,zinc_10m_101m,4,zinc10m zinc25m zinc50m zinc101m,1.0899750542190891,0.9467285112546026
