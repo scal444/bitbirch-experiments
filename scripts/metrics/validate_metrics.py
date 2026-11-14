@@ -2,7 +2,7 @@
 
    python scripts/metrics/validate_metrics.py [DS] [METHOD] [K] [SEED]   (default: np bblean_tree 3.5 0)
 
-METHOD is a label folder under BB_OUT/labels (or BB_BP_LABELS); a `_bf254` suffix reads the bf 254 labels.
+METHOD is a label folder under BB_OUT/labels (e.g. `bblean_tree`, `nvmolkit_main_bf254`).
 """
 import sys
 import warnings
@@ -14,18 +14,16 @@ from sklearn import metrics as skm
 
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
 import metrics as M  # noqa: E402
-import registry as R  # noqa: E402
+from metrics import P  # noqa: E402
 
 warnings.filterwarnings("ignore")
 ds, method = (sys.argv[1:3] + ["np", "bblean_tree"][len(sys.argv[1:3]):])[:2]
 k = float(sys.argv[3]) if len(sys.argv) > 3 else 3.5
 seed = int(sys.argv[4]) if len(sys.argv) > 4 else 0
 ctx = M.load_context(ds)
-fps = np.load(R.DATASETS[ds]["fps"])
-lab, info = M.load_labels(R.label_path(ds, method, k, seed)) if not method.endswith("_bf254") else \
-    M.load_labels(R.label_path(ds, method[:-6], k, seed, bf=254))
-butina = lab[::-1].copy() % 997  # stand-in third reference so the Butina code path is exercised
-row, trows = M.evaluate(ctx, lab, info, butina)
+fps = np.load(P.DATASETS[ds]["fps"])
+lab, info = M.load_labels(P.label_path(ds, method, k, seed))
+row, trows = M.evaluate(ctx, lab, info)
 codes, sizes = M.codes_of(lab)
 C = len(sizes)
 members = [[] for _ in range(C)]
@@ -66,7 +64,7 @@ upd("medoid iSIM non-singleton vs bblean medoids", row["medoid_isim_nonsingleton
 ms = sizes >= 2
 upd("isim (weighted)", row["isim"], sum(jt_isim_packed(fps[members[c]]) * sizes[c] for c in multi) / sizes[ms].sum())
 upd("library iSIM vs bblean", row["library_isim"], jt_isim_packed(fps))
-upd("library iSIM vs registry", row["library_isim"], R.isim(ds))
+upd("library iSIM vs isim_sigma.json", row["library_isim"], P.isim(ds))
 upd("medoid iSIM all", row["medoid_isim_all"], jt_isim_packed(fps[med_g]))
 upd("medoid iSIM non-singleton", row["medoid_isim_nonsingleton"], jt_isim_packed(fps[med_g[ms]]))
 
@@ -95,7 +93,6 @@ def ext_ref(prefix, out, labs, ref):
 
 upd("scaffold purity", row["scaffold_purity"], purity_ref(range(C)))
 ext_ref("scaf", row, codes, scaf)
-ext_ref("butina", row, codes, butina)
 if tgt is not None:
     m = tgt >= 0
     ext_ref("tgt", row, codes[m], tgt[m])
@@ -121,7 +118,6 @@ for tr in trows:
         num += sizes[c] * best[1] / scount[best[0]]; den += sizes[c]
     upd("top-k scaffold recall", tr["scaffold_recall"], num / den)
     ext_ref("top-k scaf", {f"top-k scaf_{x}": tr[f"scaf_{x}"] for x in M.EXT}, codes[mem], scaf[mem])
-    ext_ref("top-k butina", {f"top-k butina_{x}": tr[f"butina_{x}"] for x in M.EXT}, codes[mem], butina[mem])
     if tgt is not None:
         num = den = 0.0
         for c in top:

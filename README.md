@@ -29,7 +29,7 @@ just the molecules in the 20 and 50 largest clusters.
 2. **Config.** `cp config/paths.example.env config/paths.env` and fill in `BB_DATA`, `BB_OUT` (labels, outside the
    repo), the build paths, and `BB_RESULTS_NAME`. Results go to `results_<BB_RESULTS_NAME>/`, laid out like the
    example results folder.
-3. **Run.** Set the machine variables at the top of each script (threads, processes, memory), then:
+3. **Run.** Set the machine variables at the top of each script (threads, processes), then:
    ```
    bash scripts/run/run_quality_all.sh   # labels, quality metrics, MoleculeACE, refinement
    bash scripts/run/run_timings.sh       # time and peak memory; use an otherwise idle machine

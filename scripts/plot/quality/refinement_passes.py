@@ -4,7 +4,7 @@ Per dataset: within-cluster iSIM, scaffold purity, scaffold AMI and target AMI (
 number of clusters, one line per implementation along the refinement passes (pass 0 = unrefined, open marker; then
 recluster passes). Extended figures: input order 0; k = 3.5, bf 1024. Procedures: rc0 = recluster_inplace(extra_threshold=0) x10,
 rc1 = extra_threshold sigma x5, ref = refine_inplace (largest cluster) x5; one figure each.
-Data: data/refinement/quality_<ds>.csv (else BB_REFINE_CSV). The split-merge runs
+Data: data/refinement/quality_<ds>.csv. The split-merge runs
 there use 36 parts / 36 processes (BB_REFINE_MR_P overrides the label if a different P was run).
 Output: refinement_passes_<proc>_<ds|all>.* (input order 0, against the number of clusters).
 refinement_passes_all.* -- every library (rows) and the seven measures of quality_chembl34 (columns) against the recluster pass, mean and 95 % interval over all input orders, for bblean serial,
@@ -30,7 +30,7 @@ PROC = {"rc0": "recluster x10", "rc1": r"recluster (+$\sigma$) x5", "ref": "refi
 
 
 def load():
-    src = C.P.refine_csv()
+    src = C.P.REFINEMENT
     frames = [pd.read_csv(f) for f in sorted(src.glob("quality_*.csv"))]
     if not frames:
         return pd.DataFrame(), src

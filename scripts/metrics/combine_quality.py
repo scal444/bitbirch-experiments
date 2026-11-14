@@ -56,7 +56,8 @@ for name, keep in (("", KEEP), ("topk_", None)):
     old = (df.method == "bblean").to_numpy() & np.array([t in fork for t in map(tuple, df[["dataset", "k", "seed"]].values.tolist())], bool)
     df = df[~old]
     df["player"] = df.method.map(player)
-    cols = keep or [c for c in df.columns if not c.endswith("seconds") and c not in ("label_mtime", "butina_used")]
+    cols = [c for c in keep if c in df] if keep else \
+        [c for c in df.columns if not c.endswith("seconds") and c not in ("label_mtime", "butina_used")]
     if keep is None:
         cols = ["dataset", "player"] + [c for c in cols if c not in ("dataset", "player")]
     out = P.QUALITY / ("top_clusters_by_run.csv" if name else "quality.csv")

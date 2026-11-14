@@ -4,9 +4,8 @@
 
 For every labels/<ds>/<method>/k<k>/s<seed>.npy that has its .json, writes one row to metrics/<ds>.csv and one
 row per k_top to metrics/topk_<ds>.csv: clusters, singletons, within-cluster iSIM, scaffold purity, medoid iSIM,
-and ARI / AMI / V-measure against Murcko scaffolds, ChEMBL targets (BB_ACTIVES; chembl34 and c35) and the Butina
-reference (`butina_matched` labels, only where an earlier run made them; the columns stay empty otherwise). Incremental: a labelling is skipped when its row exists,
-its label file is unchanged (mtime) and its Butina column state is current (recomputed once butina_matched appears).
+and ARI / AMI / V-measure against Murcko scaffolds and ChEMBL targets (BB_ACTIVES; chembl34 and c35). A labelling
+that already has its row is skipped; --force recomputes every row.
 
 GPU (torch) work: per-cluster bit sums, iSIM, medoids, external metrics. Scaffold / target majority counts run in CPU
 threads at the same time.
@@ -24,17 +23,18 @@ import pandas as pd
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import registry as R  # noqa: E402
-
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ext_metrics import external_metrics  # noqa: E402
 
+from scripts.common import paths as P  # noqa: E402
+
 KTOPS = (5, 20, 100, 1000)
-ACTIVES = R.ACTIVES
+ACTIVES = P.path("BB_ACTIVES")
 TARGET_SETS = {"chembl34", "c35"}
 EXT = ("ari", "ami", "v_measure", "homogeneity", "completeness")
-REFS = ("scaf", "tgt", "butina")
+REFS = ("scaf", "tgt")
 CHUNK = 1 << 16  # molecules per GPU chunk (whole clusters; a bigger cluster gets its own chunk)
-OUT = R._P.QUALITY / "by_run"  # small per-run CSVs, kept in the repository
+OUT = P.QUALITY / "by_run"  # small per-run CSVs, kept in the repository
 DEV = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -141,7 +141,7 @@ def modal(codes, ref, C):
 
 def load_targets(ds, n):
     """Target code per molecule for molecules with exactly one annotated ChEMBL target, else -1."""
-    ids = (Path(R.DATASETS[ds]["fps"]).parent / "ids.txt").read_text().split()
+    ids = (Path(P.DATASETS[ds]["fps"]).parent / "ids.txt").read_text().split()
     assert len(ids) == n, (ds, len(ids), n)
     a = pd.read_csv(ACTIVES, sep="\t").drop_duplicates()
     nt = a.groupby("chembl_id")["target_chembl_id"].nunique()
@@ -180,7 +180,7 @@ def ext_cols(prefix, m):
 
 # ---------------------------------------------------------------- one labelling
 
-def evaluate(ctx, lab, info, butina):
+def evaluate(ctx, lab, info):
     t0 = time.perf_counter()
     n = len(lab)
     codes, sizes = codes_of(lab)
@@ -206,8 +206,6 @@ def evaluate(ctx, lab, info, butina):
     ext = {"scaf": external_metrics(codes, scaf)}
     if tgt is not None:
         ext["tgt"] = external_metrics(codes, tgt, subset=tgt >= 0)
-    if butina is not None:
-        ext["butina"] = external_metrics(codes, butina)
     top_members, ext_top = {}, {}
     for kt in KTOPS:
         sel = np.zeros(C, bool); sel[rank[:kt]] = True
@@ -216,8 +214,6 @@ def evaluate(ctx, lab, info, butina):
         e = {"scaf": external_metrics(codes, scaf, subset=mem)}
         if tgt is not None:
             e["tgt"] = external_metrics(codes, tgt, subset=mem & (tgt >= 0))
-        if butina is not None:
-            e["butina"] = external_metrics(codes, butina, subset=mem)
         ext_top[kt] = e
     t_ext = time.perf_counter() - t0 - t_gpu
 
@@ -274,11 +270,11 @@ def evaluate(ctx, lab, info, butina):
 
 def find_labels(ds):
     out = []
-    for p in sorted((R.BP / "labels" / ds).glob("*/k*/s*.npy")):
+    for p in sorted((P.OUT / "labels" / ds).glob("*/k*/s*.npy")):
         if p.name.endswith(".partial.npy"):
             continue
         mdir = p.parent.parent.name
-        method, bf = (mdir.rsplit("_bf", 1)[0], int(mdir.rsplit("_bf", 1)[1])) if "_bf" in mdir else (mdir, R.BF)
+        method, bf = (mdir.rsplit("_bf", 1)[0], int(mdir.rsplit("_bf", 1)[1])) if "_bf" in mdir else (mdir, P.BF)
         out.append(dict(path=p, method=mdir, base_method=method, bf=bf, k=float(p.parent.name[1:]),
                         seed=int(p.stem[1:])))
     return out
@@ -298,17 +294,12 @@ def run_dataset(ds, force=False):
     main_p, top_p = OUT / f"{ds}.csv", OUT / f"topk_{ds}.csv"
     main = pd.read_csv(main_p) if main_p.exists() and not force else pd.DataFrame()
     top = pd.read_csv(top_p) if top_p.exists() and not force else pd.DataFrame()
-    done = {}
-    for _, r in main.iterrows():
-        done[(r.method, float(r.k), int(r.seed))] = (r.label_mtime, bool(r.butina_used))
+    done = {(r.method, float(r.k), int(r.seed)) for r in main.itertuples()} if len(main) else set()
 
     ctx = None
     for item in find_labels(ds):
-        bpath = R.label_path(ds, "butina_matched", item["k"], 0)
-        has_b = bpath.exists() and bpath.with_suffix(".json").exists()
-        mtime = item["path"].stat().st_mtime
         key = (item["method"], item["k"], item["seed"])
-        if key in done and abs(done[key][0] - mtime) < 1e-6 and done[key][1] == has_b:
+        if key in done:
             continue
         lab, info = load_labels(item["path"])
         if lab is None:
@@ -318,11 +309,10 @@ def run_dataset(ds, force=False):
         if len(lab) != ctx["n"]:
             print(f"{ds} {key}: {len(lab)} labels != {ctx['n']} molecules, skipped", flush=True)
             continue
-        butina = load_labels(bpath)[0] if has_b else None
-        row, trows = evaluate(ctx, lab, info, butina)
+        row, trows = evaluate(ctx, lab, info)
         ident = dict(dataset=ds, method=item["method"], base_method=item["base_method"], bf=item["bf"], k=item["k"],
                      seed=item["seed"])
-        row = {**ident, **row, "butina_used": butina is not None, "label_mtime": mtime}
+        row = {**ident, **row}
         trows = [{**ident, **t} for t in trows]
         sel = lambda df: (df["method"] == item["method"]) & (df["k"] == item["k"]) & (df["seed"] == item["seed"])  # noqa
         if len(main):
@@ -340,7 +330,7 @@ def run_dataset(ds, force=False):
 
 def load_context(ds):
     t0 = time.perf_counter()
-    d = R.DATASETS[ds]
+    d = P.DATASETS[ds]
     fps = np.load(d["fps"])
     scaf = np.load(d["scaf"]).astype(np.int64)
     tgt = load_targets(ds, len(fps)) if ds in TARGET_SETS else None
@@ -353,7 +343,7 @@ def load_context(ds):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("datasets", nargs="*", default=list(R.DATASETS))
+    ap.add_argument("datasets", nargs="*", default=list(P.DATASETS))
     ap.add_argument("--force", action="store_true", help="recompute every row")
     a = ap.parse_args()
     torch.set_num_threads(min(32, os.cpu_count()))

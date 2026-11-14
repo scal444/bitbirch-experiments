@@ -1,6 +1,6 @@
 """Headline table: per dataset and procedure, agreement before (it0) and after the last iteration -> data/refinement/summary.csv
 
-   python scripts/refinement/summarize.py [--paths cfg.json]
+   python scripts/refinement/summarize.py
 Columns (seed means where several seeds exist):
   serial_batched_*      bblean serial vs batched (same seed)
   serial_parallel_*, parallel_batched_*   with bblean split-merge (bb multiround, P = 36)
@@ -12,7 +12,6 @@ Also data/refinement/quality_summary.csv: per dataset, procedure, iteration (0 =
 the quality metrics averaged over the seeds that have them (n_seeds): clusters, singletons, largest cluster,
 size-weighted within-cluster iSIM, scaffold purity, medoid iSIM, scaffold AMI, target AMI (chembl34, c35).
 """
-import argparse
 import sys
 from pathlib import Path
 
@@ -23,8 +22,7 @@ import common as C  # noqa: E402
 
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--paths"); a = ap.parse_args()
-    cfg = C.load_cfg(a.paths); out = Path(cfg["csv_dir"])
+    out = C.CSV_DIR
     rows = []
     for f in sorted(out.glob("agreement_*.csv")):
         ag = pd.read_csv(f); ds = f.stem.split("_", 1)[1]

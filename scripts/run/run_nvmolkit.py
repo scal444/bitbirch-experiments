@@ -1,11 +1,10 @@
 """Quality labels from nvMolKit batched (GPU). Needs a GPU and the nvMolKit build at BB_NVMOLKIT_PY (see setup/).
 
   python scripts/run/run_nvmolkit.py DS [K ...] [--seeds 0 1] [--batch-size 4096] [--bf 1024]
-         [--repeats 1] [--method nvmolkit_main] [--compare-bp]
+         [--repeats 1] [--method nvmolkit_main]
 
 Writes BB_OUT/labels/DS/METHOD/kK/sSEED.npy (+ .json with threshold, seconds, GPU memory). Times only the
-clustering call on a GPU-resident input. --compare-bp (optional) records whether the partition equals earlier labels in
-BB_BP_LABELS/DS/nvmolkit, when those exist.
+clustering call on a GPU-resident input.
 """
 import argparse
 import ctypes
@@ -21,8 +20,6 @@ import numpy as np  # noqa: E402
 import torch  # noqa: E402
 from nvmolkit.clustering import bitbirch  # noqa: E402
 
-from scripts.common.partitions import same_partition  # noqa: E402
-
 ap = argparse.ArgumentParser()
 ap.add_argument("ds")
 ap.add_argument("ks", nargs="*", type=float, default=list(P.KS))
@@ -31,7 +28,6 @@ ap.add_argument("--batch-size", type=int, default=4096)
 ap.add_argument("--bf", type=int, default=P.BF)
 ap.add_argument("--repeats", type=int, default=1)
 ap.add_argument("--method", default="nvmolkit_main")
-ap.add_argument("--compare-bp", action="store_true")
 ap.add_argument("--force", action="store_true")
 a = ap.parse_args()
 
@@ -81,9 +77,5 @@ for k in a.ks:
         info = dict(threshold=t, bf=a.bf, batch_size=a.batch_size, seconds=min(secs), seconds_all=secs,
                     clusters=int(full.max() + 1), gpu=torch.cuda.get_device_name(),
                     gpu_pool_peak_gib=max(peaks) / 2**30)
-        if a.compare_bp:
-            ref = P.label_path(a.ds, "nvmolkit", k, s, root="bp")
-            if ref.exists():
-                info["same_as_bp_nvmolkit"] = bool(same_partition(full, np.load(ref)))
         P.save_labels(out, full, info)
         print(a.ds, a.method, f"k{k:g}", f"s{s}", info, flush=True)

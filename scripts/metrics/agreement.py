@@ -23,9 +23,9 @@ n_molecules, clusters_a and clusters_b are then means as well. Ties in cluster s
 
 Writes data/quality/agreement.csv of the results folder (columns: dataset, k, impl_a, impl_b, order_a, order_b,
 subset, ami, ari, n_molecules, clusters_a, clusters_b). Pairs already in the table are kept; --force recomputes all.
-Implementation keys as in the quality tables: serial (labels `bblean_tree`; earlier `bblean` as fallback),
-multiround (bblean split-merge, `bblean_mr36`), bblean_batched (`bblean_batched`), batched (nvMolKit batched;
-earlier `nvmolkit` labels first, then `nvmolkit_main`). AMI/ARI from ext_metrics (GPU, or multithreaded CPU torch;
+Implementation keys as in the quality tables, with the label folders under BB_OUT/labels: serial (`bblean_tree`),
+multiround (bblean split-merge, `bblean_mr36`), bblean_batched (`bblean_batched`), batched (nvMolKit batched,
+`nvmolkit_main`). AMI/ARI from ext_metrics (GPU, or multithreaded CPU torch;
 matches scikit-learn, see validate_metrics.py).
 """
 import argparse
@@ -42,12 +42,8 @@ from scripts.common import paths as P  # noqa: E402
 from scripts.metrics.ext_metrics import external_metrics  # noqa: E402
 
 MAIN_P = 36  # process count of the bblean split-merge runs in the comparison
-CANDIDATES = {  # implementation -> label folders, first existing wins ("bp": earlier labels, BB_BP_LABELS)
-    "serial": [("out", "bblean_tree"), ("bp", "bblean")],
-    "multiround": [("out", f"bblean_mr{MAIN_P}")],
-    "bblean_batched": [("out", "bblean_batched")],
-    "batched": [("bp", "nvmolkit"), ("out", "nvmolkit_main")],
-}
+IMPLS = {"serial": "bblean_tree", "multiround": f"bblean_mr{MAIN_P}", "bblean_batched": "bblean_batched",
+         "batched": "nvmolkit_main"}  # implementation -> label folder
 REF = "serial"
 TOPS = (20, 50)
 OUTF = P.QUALITY / "agreement.csv"
@@ -55,22 +51,10 @@ KEY = ["dataset", "k", "impl_a", "impl_b", "order_a", "order_b", "subset"]
 COLS = KEY + ["ami", "ari", "n_molecules", "clusters_a", "clusters_b"]
 
 
-def label_file(ds, impl, k, seed):
-    for root, m in CANDIDATES[impl]:
-        p = P.label_path(ds, m, k, seed, root="bp" if root == "bp" else None)
-        if p.exists():
-            return p
-    return None
-
-
 def orders_with_labels(ds, impl, k):
-    """Every input order that has labels for this implementation (label files s<order>.npy in any folder)."""
-    found = {}
-    for root, m in CANDIDATES[impl]:
-        d = P.label_path(ds, m, k, 0, root="bp" if root == "bp" else None).parent
-        for f in d.glob("s*.npy") if d.is_dir() else []:
-            if f.stem[1:].isdigit():
-                found.setdefault(int(f.stem[1:]), label_file(ds, impl, k, int(f.stem[1:])))
+    """Every input order that has labels for this implementation: {order: label file s<order>.npy}."""
+    d = P.label_path(ds, IMPLS[impl], k, 0).parent
+    found = {int(f.stem[1:]): f for f in d.glob("s*.npy") if f.stem[1:].isdigit()} if d.is_dir() else {}
     return dict(sorted(found.items()))
 
 
@@ -127,11 +111,11 @@ def main():
 
     for ds in a.datasets:
         for k in a.ks:
-            files = {impl: orders_with_labels(ds, impl, k) for impl in CANDIDATES}
+            files = {impl: orders_with_labels(ds, impl, k) for impl in IMPLS}
             jobs = []
             for impl, fs in files.items():  # within: unordered pairs of different orders
                 jobs += [(impl, impl, sa, sb) for sa, sb in itertools.combinations(fs, 2)]
-            for impl in CANDIDATES:  # across: serial on order a against impl on order b, a != b
+            for impl in IMPLS:  # across: serial on order a against impl on order b, a != b
                 if impl != REF:
                     jobs += [(REF, impl, sa, sb) for sa in files[REF] for sb in files[impl] if sa != sb]
             print(ds, f"k{k:g}", {i: list(f) for i, f in files.items()}, f"{len(jobs)} pairs", flush=True)

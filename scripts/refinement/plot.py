@@ -1,6 +1,6 @@
 """Working figures from data/refinement/agreement_<ds>.csv and data/refinement/quality_<ds>.csv -> BB_REFINE_POST_LABELS/figures/*.png (working figures, outside git)
 
-   python scripts/refinement/plot.py [--paths cfg.json] [--datasets c35,np,scu,ena1m,chembl34]
+   python scripts/refinement/plot.py [--datasets c35,np,scu,ena1m,chembl34]
 """
 import argparse
 import sys
@@ -25,8 +25,8 @@ plt.rcParams.update({"figure.facecolor": "white", "axes.facecolor": "white", "sa
                      "font.size": 9, "axes.spines.top": False, "axes.spines.right": False})
 
 
-def load(cfg, dss):
-    out = Path(cfg["csv_dir"])
+def load(dss):
+    out = C.CSV_DIR
     a = pd.concat([pd.read_csv(out / f"agreement_{d}.csv") for d in dss if (out / f"agreement_{d}.csv").exists()])
     q = pd.concat([pd.read_csv(out / f"quality_{d}.csv") for d in dss if (out / f"quality_{d}.csv").exists()])
     return a, q
@@ -138,10 +138,10 @@ def fig_quality(q, dss, path):
 
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--paths"); ap.add_argument("--datasets", default="c35,np,scu,ena1m,chembl34")
-    a = ap.parse_args(); cfg = C.load_cfg(a.paths)
-    figs = Path(cfg["fig_dir"]); figs.mkdir(parents=True, exist_ok=True)
-    ag, q = load(cfg, a.datasets.split(","))
+    ap = argparse.ArgumentParser(); ap.add_argument("--datasets", default="c35,np,scu,ena1m,chembl34")
+    a = ap.parse_args()
+    figs = C.FIG_DIR; figs.mkdir(parents=True, exist_ok=True)
+    ag, q = load(a.datasets.split(","))
     dss = [d for d in a.datasets.split(",") if d in set(q.dataset)]
     fig_players(ag, dss, figs / "agreement_between_players.png")
     fig_clusters(q, ag, dss, figs / "clusters_and_change_by_iteration.png")

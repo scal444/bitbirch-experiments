@@ -3,12 +3,14 @@
 Data is read only through scripts/common/paths.py (config/). Each loader returns what exists now, so a plot script
 picks up new CSVs when they appear and draws only finished runs.
 
-Implementation keys used in code, with the label folders they read:
-  serial      bblean serial (`bblean_tree`; earlier `bblean` labels as fallback)
+Implementation keys used in code, with the label folders behind them:
+  serial      bblean serial (`bblean_tree`)
   multiround  bblean split-merge (bb multiround), P = 36 (`bblean_mr36`)
   bblean_batched  bblean batched, multithreaded CPU (`bblean_batched`)
-  batched     nvMolKit batched, GPU (`nvmolkit_main`; earlier `nvmolkit` labels first where present)
-Performance figures call the last two `cpu_batched` and `gpu`.
+  batched     nvMolKit batched, GPU (`nvmolkit_main`)
+Performance figures call the last two `cpu_batched` and `gpu`. A results folder may also hold
+data/quality/by_run_earlier_labels/ (metrics of earlier labels, methods `bblean` and `nvmolkit`); load_metrics reads
+it where it exists.
 """
 import re
 import sys
@@ -298,19 +300,7 @@ def quality_player(method):
     return None
 
 
-def perf_player(method):
-    m = str(method).lower()
-    if "butina" in m:
-        return "butina"
-    if m.startswith("nvmolkit") or m in ("gpu", "player3"):
-        return "gpu"
-    if "batched" in m or m in ("player4",):
-        return "cpu_batched"
-    if "_mr" in m or "multiround" in m or m in ("player2",):
-        return "multiround"
-    if m in ("bblean", "bblean_tree", "serial", "player1"):
-        return "serial"
-    return None
+PERF_PLAYER = {"serial": "serial", "multiround": "multiround", "batched": "cpu_batched", "nvmolkit": "gpu"}  # timings.csv
 
 
 # ---------------------------------------------------------------- quality metrics (earlier + new)
@@ -388,30 +378,6 @@ def legend_below(fig, axes, ncol=3, y=0.0):
     fig.legend(hs, ls, loc="upper center", bbox_to_anchor=(0.5, y), ncol=ncol, frameon=False)
 
 
-def read_csvs(folder, pattern="*.csv"):
-    """All CSVs matching pattern under folder (recursive), concatenated with a `file` column; empty if none."""
-    folder = Path(folder)
-    fs = sorted(folder.rglob(pattern)) if folder.exists() else []
-    frames = []
-    for f in fs:
-        try:
-            d = pd.read_csv(f)
-        except (pd.errors.EmptyDataError, pd.errors.ParserError):
-            continue
-        d["file"] = str(f.relative_to(folder))
-        frames.append(d)
-    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-
-
-def pick(d, *names):
-    """First column of d among names (case-insensitive), or None."""
-    low = {c.lower(): c for c in d.columns}
-    for n in names:
-        if n.lower() in low:
-            return low[n.lower()]
-    return None
-
-
 # ---------------------------------------------------------------- timing CSVs (data/timing/)
 
 PERF_DS = {"ena1m": "Enamine 1M", "chembl34": "ChEMBL34", "ena10m": "Enamine 10M", "zinc10m": "ZINC20 10M",
@@ -419,45 +385,20 @@ PERF_DS = {"ena1m": "Enamine 1M", "chembl34": "ChEMBL34", "ena10m": "Enamine 10M
 
 
 def load_perf(all_bf=False):
-    """All timing rows under data/timing/ (scripts/run/perf_run.py writes timings.csv), normalised to: player, dataset, n, threads, seconds (best of repeats),
-    peak_gib. Rows marked unfinished (status not ok/done, or no time) are dropped. Filters to bf 1024 / k 3.5 when
-    those columns exist (all_bf=True keeps every branching factor). Accepted column names are listed below; adjust here if the timing CSVs use others."""
-    d = read_csvs(P.TIMING, "timings*.csv")
-    if d.empty:
-        return d
-    out = pd.DataFrame()
-    pc = pick(d, "player", "method", "tool")
-    out["player"] = d[pc].map(perf_player) if pc else None
-    out["method"] = d[pc] if pc else None
-    dc = pick(d, "dataset", "ds", "set")
-    out["dataset"] = d[dc].astype(str) if dc else "?"
-    nc = pick(d, "n", "molecules", "n_molecules", "rows", "size")
-    out["n"] = pd.to_numeric(d[nc], errors="coerce") if nc else np.nan
-    out["threads"] = np.nan
-    for c in ("threads", "processes", "ps", "n_threads"):  # threads for bblean-batched, processes for multiround
-        if pick(d, c):
-            out["threads"] = out["threads"].fillna(pd.to_numeric(d[pick(d, c)], errors="coerce"))
-    sc = pick(d, "seconds_min", "best_seconds", "seconds", "wall_seconds", "time_s", "secs")
-    out["seconds"] = pd.to_numeric(d[sc], errors="coerce") if sc else np.nan
-    # timings.csv (scripts/run/perf_run.py): GPU memory for nvMolKit, host peak RSS for the CPU players
-    gp, hp = pick(d, "gpu_pool_peak_gib", "gpu_peak_gib"), pick(d, "host_peak_gib", "peak_rss_gib", "peak_gib")
-    gpu_row = out["player"].isin(["gpu", "butina"])
-    peak = pd.Series(np.nan, index=d.index)
-    if gp:  # nvMolKit: GPU memory pool peak (the device copy of the input is gpu_input_gib)
-        peak[gpu_row] = pd.to_numeric(d.loc[gpu_row, gp], errors="coerce")
-    gi = pick(d, "gpu_input_gib")
-    out["gpu_input_gib"] = pd.to_numeric(d[gi], errors="coerce") if gi else np.nan
-    if hp:
-        peak[~gpu_row] = pd.to_numeric(d.loc[~gpu_row, hp], errors="coerce")
-    out["peak_gib"] = peak
-    for col, val in (("bf", P.BF), ("k", 3.5)):
-        c = pick(d, col, "branching_factor" if col == "bf" else "sigma_k")
-        out[col] = pd.to_numeric(d[c], errors="coerce") if c else val
-    stc = pick(d, "status", "state")
-    ok = d[stc].astype(str).str.lower().isin(["ok", "done", "finished", "success", "true"]) if stc else True
-    if "superseded" in d.columns:  # GPU rows timed while other processes held the GPU (results folder README, data/timing)
-        ok = ok & ~d["superseded"].astype(str).str.lower().eq("true")
-    out["when"] = d[pick(d, "when")] if pick(d, "when") else ""
+    """Rows of data/timing/timings.csv (scripts/run/perf_run.py writes it) as: player, dataset, n, threads (threads for
+    bblean batched, processes for split-merge), seconds (best of repeats), peak_gib (GPU pool for nvMolKit, host peak
+    RSS otherwise), gpu_input_gib. k 3.5 only; bf 1024 only unless all_bf. Rows with `superseded` = True are skipped."""
+    f = P.TIMING / "timings.csv"
+    if not f.exists():
+        return pd.DataFrame()
+    d = pd.read_csv(f)
+    out = pd.DataFrame({"player": d["player"].map(PERF_PLAYER), "dataset": d["set"].astype(str),
+                        "n": d["n"], "threads": d["threads"].fillna(d["processes"]), "seconds": d["seconds_min"]})
+    gpu_row = out["player"].eq("gpu")
+    out["gpu_input_gib"] = d["gpu_input_gib"]
+    out["peak_gib"] = d["gpu_pool_peak_gib"].where(gpu_row, d["host_peak_gib"])
+    out["bf"], out["k"], out["when"] = d["bf"], d["k"], d["when"]
+    ok = ~d["superseded"].astype(str).str.lower().eq("true") if "superseded" in d else True
     out = out[ok & out.player.notna() & out.seconds.notna() & (out.k == 3.5)]
     if not all_bf:
         out = out[out.bf == P.BF]

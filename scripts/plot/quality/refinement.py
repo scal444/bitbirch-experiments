@@ -26,7 +26,7 @@ DX = 0.17  # before at j - DX, after at j + DX
 
 def main():
     C.style()
-    f = C.P.refine_csv() / f"quality_{MAIN_DS}.csv"
+    f = C.P.REFINEMENT / f"quality_{MAIN_DS}.csv"
     if not f.exists():
         C.waiting("refinement_chembl34", f"no {f}"); return
     d = pd.read_csv(f)

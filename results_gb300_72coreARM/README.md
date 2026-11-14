@@ -116,7 +116,8 @@ choices of reference. Ties in cluster size go to the lower cluster id.
 | tgt_* | the same against ChEMBL targets, on `tgt_molecules` only |
 | butina_* | the same against the old Butina reference; not plotted |
 
-`by_run/` also has `label_mtime` and `butina_used` (bookkeeping).
+`by_run/` also has `label_mtime` and `butina_used` (bookkeeping). The current `metrics.py` writes neither these nor
+`butina_*`.
 
 **top_clusters_by_run.csv, by_run/topk_<ds>.csv**: as above, restricted to the `k_top` (5, 20, 100, 1000) largest
 clusters, plus `top_clusters`, `top_molecules`, `top_fraction`, `smallest_top_size`, `scaffold_recall` (per cluster,
@@ -125,7 +126,8 @@ share of all molecules with its main scaffold that it holds, size-weighted) and 
 **top_clusters.csv, size_bins.csv** (ChEMBL34, SCUBIDOO, Enamine 1M; k = 3, 3.5, 4; order 0). `player`: `serial`,
 `multiround`, `batched` (nvMolKit), `bblean_batched`. `top_clusters.csv`: `dataset, player, k, seed, rank, size,
 unique_scaffolds, isim, label_mtime` for the 20 largest clusters. `size_bins.csv`: `clusters` and `gt0`, `gt1`,
-`gt10`, `gt100`, `gt1000` (clusters with more than that many members), `label_mtime`.
+`gt10`, `gt100`, `gt1000` (clusters with more than that many members), `label_mtime` (not written by the current
+`top_clusters.py`).
 
 ## data/timing/
 
@@ -157,7 +159,7 @@ to 10M rows, a single run from 25M up.
 | load_before | 1-minute load average at start (info only; newer scripts leave it empty) |
 | tag | `sweep` (threads for `batched`, processes for `multiround`: 1, 2, 4, 8, 16, 36, 72 on ChEMBL34 and Enamine 10M); `retime` (GPU rerun alone on the GPU); `other_gpu_procs=N` (older rows only); `rounds={...}` (bblean's per-round seconds for split-merge) |
 | when | start time |
-| superseded | True for GPU rows timed while other processes held the GPU and later retimed; the figures skip them |
+| superseded | True for GPU rows timed while other processes held the GPU (`other_gpu_procs` ≥ 1) and later retimed; the figures and `perf_finalize.py` skip them. Empty for rows added after that |
 
 **scaling_exponents.csv**: slope b of log(time) = a + b·log(N) (`time_exponent`) and the same for memory
 (`memory_exponent`; host peak for CPU, GPU pool + input for nvMolKit), per `player` (`batched` at 36 threads,

@@ -35,11 +35,6 @@ def path(key):
     return Path(os.path.expanduser(CFG[key]))
 
 
-def opt_path(key, default):
-    """Optional config key with a default (no entry needed in paths.env)."""
-    return Path(os.path.expanduser(CFG.get(key, str(default))))
-
-
 DATA, OUT = path("BB_DATA"), path("BB_OUT")
 # Results folder: <repo>/results_<BB_RESULTS_NAME>/, with data/ (CSV and JSON written by the metric, timing and
 # refinement scripts) and plots/ (figures written by scripts/plot/make_all.py). Set BB_RESULTS_NAME in
@@ -56,14 +51,6 @@ MOLECULEACE = RES_DATA / "moleculeace"    # MoleculeACE runs and indices
 ZINC22 = RES_DATA / "zinc22"              # the 12.16 billion molecule ZINC22 run
 THRESHOLDS = RES_DATA / "thresholds"      # isim_sigma.json: iSIM and sigma per library
 CHECKS = RES_DATA / "checks"              # runs that must give identical clusters do
-
-
-def refine_csv():
-    """Refinement experiment tables: data/refinement of the results folder, else BB_REFINE_CSV (optional, kept
-    elsewhere)."""
-    if REFINEMENT.is_dir() and any(REFINEMENT.glob("quality_*.csv")):
-        return REFINEMENT
-    return opt_path("BB_REFINE_CSV", REFINEMENT)
 
 
 BF = 1024
@@ -124,12 +111,9 @@ def kstr(k):
     return f"k{k:g}"
 
 
-def label_path(ds, method, k, seed, root=None):
-    """Labels as int32 .npy (cluster id per original row) + .json with run info.
-
-    root=None -> labels under BB_OUT/labels; root="bp" -> earlier labels reused from BB_BP_LABELS (optional)."""
-    base = opt_path("BB_BP_LABELS", OUT / "earlier_labels") if root == "bp" else OUT / "labels"
-    return base / ds / method / kstr(k) / f"s{seed}.npy"
+def label_path(ds, method, k, seed):
+    """Labels under BB_OUT/labels as int32 .npy (cluster id per original row) + .json with run info."""
+    return OUT / "labels" / ds / method / kstr(k) / f"s{seed}.npy"
 
 
 def perm(n, seed):
