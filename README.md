@@ -35,10 +35,13 @@ just the molecules in the 20 and 50 largest clusters.
    bash scripts/run/run_timings.sh       # time and peak memory; use an otherwise idle machine
    ```
    Each takes many hours at full size. Both take stage names to run only part. The quality script skips outputs
-   that already exist; the timing script appends a row per run. Stages and single-run commands:
+   that already exist; the timing script appends a row per run. A failed step doesn't stop either script; the
+   failures are listed at the end and the script exits non-zero. Stages and single-run commands:
    [`scripts/README.md`](scripts/README.md).
 4. **Plot.** `python scripts/plot/make_all.py` writes all figures (PNG) and `plots/INDEX.md`. It only reads the
-   tables under `data/`, so it can redraw any results folder's figures without the fingerprints or a GPU.
+   tables under `data/`, so it can redraw any results folder's figures without the fingerprints or a GPU. Without
+   `config/paths.env` it redraws the example results, so that works straight after cloning. Every other script
+   stops if `config/paths.env` is missing, so nothing gets written into the example folder by accident.
 
 Clusters don't depend on the hardware (same input order and threshold give the same clusters); times do. If you
 publish timings, state the system.

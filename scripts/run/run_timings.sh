@@ -23,12 +23,15 @@ P_MAIN=${P_MAIN:-36}                      # bb multiround processes (= input par
 WORKERS=${WORKERS:-"1 2 4 8 16 36 72"}    # thread / process counts of the sweep
 
 cd "$(dirname "$0")/../.."
+[ -f config/paths.env ] || [ -n "$BB_RESULTS_NAME" ] || {
+  echo "config/paths.env not found: run \`cp config/paths.example.env config/paths.env\` and edit it"; exit 1; }
 SIZES="ena1m chembl34 ena10m zinc10m zinc25m zinc50m zinc101m"
 CPU_SIZES="ena1m chembl34 ena10m zinc10m zinc25m"
 SWEEP_SETS="chembl34 ena10m"
 
+FAILED=()   # failed runs; the script keeps going and lists them at the end
 pr() {  # one timed run
-  python scripts/run/perf_run.py "$@" || echo "FAILED perf_run $*"
+  python scripts/run/perf_run.py "$@" || { echo "FAILED perf_run $*"; FAILED+=("perf_run $*"); }
 }
 reps() { case $1 in zinc25m|zinc50m|zinc101m) echo 1;; *) echo 2;; esac; }
 
@@ -65,11 +68,15 @@ stage_big() {
   pr serial zinc101m --repeats 1
 }
 
-stage_finalize() { python scripts/run/perf_finalize.py --write; }
+stage_finalize() { python scripts/run/perf_finalize.py --write || FAILED+=("perf_finalize"); }
 
 STAGES=${*:-inputs gpu sweep cpu big finalize}
 for st in $STAGES; do
   date; echo "STAGE $st"
   "stage_$st"
 done
-date; echo TIMINGS_DONE
+date
+if [ ${#FAILED[@]} -gt 0 ]; then
+  echo "TIMINGS_DONE with ${#FAILED[@]} failed run(s):"; printf '  %s\n' "${FAILED[@]}"; exit 1
+fi
+echo TIMINGS_DONE

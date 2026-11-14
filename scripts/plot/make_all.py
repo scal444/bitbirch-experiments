@@ -2,7 +2,8 @@
 
   python scripts/plot/make_all.py [--metrics]
 
-The results folder is results_<BB_RESULTS_NAME> (config/paths.env). First rebuilds data/quality/quality.csv and
+The results folder is results_<BB_RESULTS_NAME> (config/paths.env). Without config/paths.env it redraws the
+example results (results_gb300_72coreARM), so they can be redrawn straight after cloning. First rebuilds data/quality/quality.csv and
 top_clusters_by_run.csv from the per-run metrics (scripts/metrics/combine_quality.py, CSV only), so the combined
 tables never lag behind. --metrics also refreshes the largest-cluster tables (scripts/metrics/top_clusters.py,
 needs the labels under BB_OUT). Then runs every script in scripts/plot/quality, timing and other; each writes its
@@ -10,12 +11,15 @@ figures to plots/<topic>/<level>/ as .png (placement: FIGURES in scripts/plot/co
 plots/INDEX.md, one line per figure. A figure whose data is missing is reported as waiting, not drawn.
 """
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
+if not (REPO / "config" / "paths.env").exists():
+    os.environ.setdefault("BB_RESULTS_NAME", "gb300_72coreARM")  # also seen by the scripts run below
 sys.path.insert(0, str(HERE))
 import common as C  # noqa: E402
 

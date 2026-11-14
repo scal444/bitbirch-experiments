@@ -35,4 +35,4 @@ tar xzf "$WORK/bblean_src/bblean-0.10.3.tar.gz" -C "$WORK/bblean_src"
 BITBIRCH_BUILD_CPP=1 pip install --no-deps --no-build-isolation "$WORK/bblean_src/bblean-0.10.3"
 pip install bblean==0.10.3  # remaining dependencies
 python -W error -c "import bblean._cpp_similarity"  # fails if the C++ extension was not built
-python -c "import torch, triton, rdkit, bblean, numpy; print(torch.__version__, triton.__version__, rdkit.__version__, bblean.__version__, numpy.__version__)"
+python -c "import torch, rdkit, bblean, numpy; print(torch.__version__, rdkit.__version__, bblean.__version__, numpy.__version__)"

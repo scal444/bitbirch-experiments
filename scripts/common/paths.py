@@ -1,13 +1,15 @@
 """Paths, datasets and thresholds for every script in this repo.
 
-Reads config/paths.env if it exists, else config/paths.example.env; any key can be
-overridden by an environment variable of the same name. Per-dataset fingerprint and
+Reads config/paths.env and stops if it's missing (copy config/paths.example.env first); any key can be
+overridden by an environment variable of the same name. Exception: when BB_RESULTS_NAME is set in the environment
+(make_all.py does this to redraw the example results), a missing paths.env falls back to paths.example.env. Per-dataset fingerprint and
 scaffold files can be overridden with BB_FPS_<DS> / BB_SCAF_<DS> (DS upper case).
 Defines the results folder (results_<BB_RESULTS_NAME>), the five quality libraries (_DS below), the thresholds
 t = iSIM + k * sigma, the input orders and the label layout.
 """
 import json
 import os
+import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -15,15 +17,16 @@ REPO = Path(__file__).resolve().parents[2]
 
 def _load():
     cfg = {}
-    for name in ("paths.env", "paths.example.env"):
-        f = REPO / "config" / name
-        if f.exists():
-            for line in f.read_text().splitlines():
-                line = line.split("#", 1)[0].strip()
-                if "=" in line:
-                    k, v = line.split("=", 1)
-                    cfg[k.strip()] = v.strip()
-            break
+    f = REPO / "config" / "paths.env"
+    if not f.exists():
+        if "BB_RESULTS_NAME" not in os.environ:
+            sys.exit("config/paths.env not found: run `cp config/paths.example.env config/paths.env` and edit it")
+        f = REPO / "config" / "paths.example.env"
+    for line in f.read_text().splitlines():
+        line = line.split("#", 1)[0].strip()
+        if "=" in line:
+            k, v = line.split("=", 1)
+            cfg[k.strip()] = v.strip()
     cfg.update({k: v for k, v in os.environ.items() if k.startswith("BB_")})
     return cfg
 
@@ -39,8 +42,8 @@ DATA, OUT = path("BB_DATA"), path("BB_OUT")
 # Results folder: <repo>/results_<BB_RESULTS_NAME>/, with data/ (CSV and JSON written by the metric, timing and
 # refinement scripts) and plots/ (figures written by scripts/plot/make_all.py). Set BB_RESULTS_NAME in
 # config/paths.env (or the environment) to a short description of your machine or run to get your own folder.
-DEFAULT_RESULTS_NAME = "gb300_72coreARM"  # the results that come with the repository
-RESULTS_NAME = CFG.get("BB_RESULTS_NAME", DEFAULT_RESULTS_NAME)
+DEFAULT_RESULTS_NAME = "gb300_72coreARM"  # the results that come with the repository (written only if named)
+RESULTS_NAME = CFG.get("BB_RESULTS_NAME", "my_machine")
 RESULTS = REPO / f"results_{RESULTS_NAME}"
 RES_DATA = RESULTS / "data"
 PLOTS = RESULTS / "plots"

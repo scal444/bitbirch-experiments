@@ -23,10 +23,13 @@ THREADS=${THREADS:-36}     # CPU threads for bblean batched
 P_MAIN=${P_MAIN:-36}       # processes (= input parts) for bblean split-merge
 
 cd "$(dirname "$0")/../.."
+[ -f config/paths.env ] || [ -n "$BB_RESULTS_NAME" ] || {
+  echo "config/paths.env not found: run \`cp config/paths.example.env config/paths.env\` and edit it"; exit 1; }
 DATASETS="chembl34 scu ena1m c35 np"
 EXTRA_ORDERS="3 4 5 6 7 8 9"   # extra ChEMBL34 input orders at k = 3.5 (orders 0-2 come with the defaults)
 R=scripts/run
-run() { echo "+ $*"; "$@" || echo "FAILED: $*"; }
+FAILED=()   # failed steps; the script keeps going and lists them at the end
+run() { echo "+ $*"; "$@" || { echo "FAILED: $*"; FAILED+=("$*"); }; }
 
 stage_labels() {
   for ds in $DATASETS; do
@@ -82,4 +85,8 @@ for st in $STAGES; do
   date; echo "STAGE $st"
   "stage_$st"
 done
-date; echo QUALITY_ALL_DONE
+date
+if [ ${#FAILED[@]} -gt 0 ]; then
+  echo "QUALITY_ALL_DONE with ${#FAILED[@]} failed step(s):"; printf '  %s\n' "${FAILED[@]}"; exit 1
+fi
+echo QUALITY_ALL_DONE
