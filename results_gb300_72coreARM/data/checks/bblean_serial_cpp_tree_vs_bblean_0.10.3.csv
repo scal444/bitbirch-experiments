@@ -1,4 +1,4 @@
-dataset,k,seed,fork,bp,same,clusters_fork,clusters_bp,fork_build,fork_seconds
+dataset,k,seed,cpp_tree_labels,bblean_0.10.3_labels,same_partition,clusters_cpp_tree,clusters_bblean_0.10.3,cpp_tree_build,cpp_tree_seconds
 chembl34,3.0,0,True,True,True,111715,111715,/localhome/local-kboyd/experiments/bitbirch-techreport-build/bblean-cpp-tree,23.88
 chembl34,3.0,1,True,True,True,105909,105909,/localhome/local-kboyd/experiments/bitbirch-techreport-build/bblean-cpp-tree,23.2
 chembl34,3.0,2,True,True,True,116483,116483,/localhome/local-kboyd/experiments/bitbirch-techreport-build/bblean-cpp-tree,26.53

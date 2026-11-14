@@ -23,11 +23,11 @@ def main(k=3.5):
     t = t[t.k == k]
     for ds in [d for d in ("ena1m", "scu", "chembl34") if d in set(t.dataset)]:
         d = t[t.dataset == ds]
-        players = C.players_present(d)
-        fig, axs = plt.subplots(2, len(players), figsize=(C.FULLW, 2.6), sharex=True, sharey="row", squeeze=False,
+        impls = C.implementations_present(d)
+        fig, axs = plt.subplots(2, len(impls), figsize=(C.FULLW, 2.6), sharex=True, sharey="row", squeeze=False,
                                 gridspec_kw=dict(height_ratios=[1.6, 1]))
-        for j, p in enumerate(players):
-            s = d[d.player == p].sort_values("rank")
+        for j, p in enumerate(impls):
+            s = d[d.implementation == p].sort_values("rank")
             st = C.QP[p]
             axs[0, j].bar(s["rank"], s["size"], width=0.75, color=st["color"])
             axs[1, j].plot(s["rank"], s["isim"], ls="none", marker=st["marker"], color=st["color"], ms=3.5)

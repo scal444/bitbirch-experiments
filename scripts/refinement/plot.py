@@ -16,10 +16,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common as C  # noqa: E402
 
 NAMES = {"c35": "ChEMBL35 additions", "np": "ChEMBL NP", "scu": "SCUBIDOO", "ena1m": "Enamine 1M", "chembl34": "ChEMBL34"}
-PLAYER = {"serial": "bblean serial", "parallel": "bblean parallel", "batched": "nvMolKit batched"}
-PCOL = {"serial": "#eb6834", "parallel": "#f4a582", "batched": "#76B900"}  # house colours (colour = method)
-PAIRS = [("serial", "batched"), ("serial", "parallel"), ("parallel", "batched")]
-PAIRCOL = {("serial", "batched"): "#76B900", ("serial", "parallel"): "#f4a582", ("parallel", "batched"): "#4b6a88"}
+NAME = {"bblean_serial": "bblean serial", "bblean_split_merge": "bblean split-merge",
+        "bblean_batched": "bblean batched"}
+PCOL = {"bblean_serial": "#eb6834", "bblean_split_merge": "#f4a582", "bblean_batched": "#1f3a68"}  # house colours
+SER, SM, BAT = C.IMPLEMENTATIONS
+PAIRS = [(SER, BAT), (SER, SM), (SM, BAT)]
+PAIRCOL = {(SER, BAT): "#1f3a68", (SER, SM): "#f4a582", (SM, BAT): "#4b6a88"}
 PROC = {"rc0": "recluster, +0", "rc1": "recluster, +1σ per pass", "ref": "split largest + refit"}
 plt.rcParams.update({"figure.facecolor": "white", "axes.facecolor": "white", "savefig.facecolor": "white",
                      "font.size": 9, "axes.spines.top": False, "axes.spines.right": False})
@@ -32,8 +34,9 @@ def load(dss):
     return a, q
 
 
-def fig_players(a, dss, path):
-    """Between-player AMI by iteration (seed-mean), with the same-player different-seed AMI as the reference."""
+def fig_implementations(a, dss, path):
+    """AMI between implementations by iteration (seed-mean), with the same implementation on another input order as
+    the reference."""
     procs = list(C.PROCS)
     fig, axs = plt.subplots(len(procs), len(dss), figsize=(2.6 * len(dss), 2.2 * len(procs)), sharey=True,
                             squeeze=False)
@@ -41,13 +44,13 @@ def fig_players(a, dss, path):
         d = a[a.dataset == ds]
         for i, proc in enumerate(procs):
             ax = axs[i, j]
-            p = d[(d.kind == "players") & (d.proc == proc)]
+            p = d[(d.kind == "implementations") & (d.proc == proc)]
             for pa, pb in PAIRS:
-                s = p[(p.player_a == pa) & (p.player_b == pb)].groupby("it").ami.mean()
+                s = p[(p.implementation_a == pa) & (p.implementation_b == pb)].groupby("it").ami.mean()
                 if len(s):
                     ax.plot(s.index, s.values, "-o", ms=3, lw=1.6, color=PAIRCOL[(pa, pb)],
-                            label=f"{PLAYER[pa]} vs {PLAYER[pb]}")
-            sd = d[(d.kind == "seeds") & (d.proc == proc) & (d.player_a == "serial")].groupby("it").ami.mean()
+                            label=f"{NAME[pa]} vs {NAME[pb]}")
+            sd = d[(d.kind == "seeds") & (d.proc == proc) & (d.implementation_a == SER)].groupby("it").ami.mean()
             if len(sd):
                 ax.plot(sd.index, sd.values, "--", lw=1.4, color="#52514e", label="bblean serial vs itself, other seed")
             if i == 0:
@@ -65,7 +68,7 @@ def fig_players(a, dss, path):
             if ll not in l:
                 h.append(hh); l.append(ll)
     fig.legend(h, l, loc="lower center", ncol=2, frameon=False, bbox_to_anchor=(0.5, 0))
-    fig.suptitle("Agreement between BitBIRCH players during bblean refinement (k = 3.5)", y=0.995)
+    fig.suptitle("Agreement between BitBIRCH implementations during bblean refinement (k = 3.5)", y=0.995)
     fig.tight_layout(rect=(0, 0.08, 1, 0.98))
     fig.savefig(path, dpi=150); plt.close(fig)
 
@@ -78,15 +81,16 @@ def fig_clusters(q, a, dss, path):
     for j, ds in enumerate(dss):
         for i, (proc, what) in enumerate(rows):
             ax = axs[i, j]
-            for pl in C.PLAYERS:
+            for pl in C.IMPLEMENTATIONS:
                 if what == "clusters":
-                    s = q[(q.dataset == ds) & (q.seed == 0) & (q.proc == proc) & (q.player == pl)].set_index("it").clusters
+                    s = q[(q.dataset == ds) & (q.seed == 0) & (q.proc == proc) & (q.implementation == pl)]
+                    s = s.set_index("it").clusters
                     s = s / 1e3
                 else:
                     s = a[(a.dataset == ds) & (a.seed == 0) & (a.kind == "previous") & (a.proc == proc)
-                          & (a.player_a == pl)].set_index("it").ami
+                          & (a.implementation_a == pl)].set_index("it").ami
                 if len(s):
-                    ax.plot(s.index, s.values, "-o", ms=3, lw=1.6, color=PCOL[pl], label=PLAYER[pl])
+                    ax.plot(s.index, s.values, "-o", ms=3, lw=1.6, color=PCOL[pl], label=NAME[pl])
             if what == "clusters":
                 ax.set_ylim(bottom=0)
             if i == 0:
@@ -115,14 +119,14 @@ def fig_quality(q, dss, path):
         d = q[(q.dataset == ds) & (q.seed == 0)]
         for i, (m, lab, sc) in enumerate(metrics):
             ax = axs[i, j]
-            for k, pl in enumerate(C.PLAYERS):
+            for k, pl in enumerate(C.IMPLEMENTATIONS):
                 vals = []
                 for proc, it, _ in stages:
-                    r = d[(d.player == pl) & (d.it == it) & ((d.proc == proc) if it else True)]
+                    r = d[(d.implementation == pl) & (d.it == it) & ((d.proc == proc) if it else True)]
                     vals.append(r[m].iloc[0] * sc if len(r) else np.nan)
                 x = np.arange(len(stages)) + (k - 1) * w
                 ok = ~np.isnan(vals)
-                ax.bar(x[ok], np.array(vals)[ok], w * 0.92, color=PCOL[pl], label=PLAYER[pl])
+                ax.bar(x[ok], np.array(vals)[ok], w * 0.92, color=PCOL[pl], label=NAME[pl])
             ax.set_xticks(range(len(stages)))
             ax.set_xticklabels(["none", "rc +0\n×10", "rc +1σ\n×5", "split\n×5"] if i == len(metrics) - 1 else [])
             if i == 0:
@@ -132,7 +136,7 @@ def fig_quality(q, dss, path):
             ax.grid(axis="y", color="#e6e6e3", lw=0.6); ax.set_axisbelow(True)
     h, l = axs[0, 0].get_legend_handles_labels()
     fig.legend(h, l, loc="lower center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 0))
-    fig.suptitle("Cluster quality before and after bblean refinement, per player (k = 3.5, seed 0)", y=0.995)
+    fig.suptitle("Cluster quality before and after bblean refinement, per implementation (k = 3.5, seed 0)", y=0.995)
     fig.tight_layout(rect=(0, 0.04, 1, 0.98))
     fig.savefig(path, dpi=150); plt.close(fig)
 
@@ -143,7 +147,7 @@ def main():
     figs = C.FIG_DIR; figs.mkdir(parents=True, exist_ok=True)
     ag, q = load(a.datasets.split(","))
     dss = [d for d in a.datasets.split(",") if d in set(q.dataset)]
-    fig_players(ag, dss, figs / "agreement_between_players.png")
+    fig_implementations(ag, dss, figs / "agreement_between_implementations.png")
     fig_clusters(q, ag, dss, figs / "clusters_and_change_by_iteration.png")
     fig_quality(q, dss, figs / "quality_before_after.png")
     print("wrote", *sorted(p.name for p in figs.glob("*.png")))

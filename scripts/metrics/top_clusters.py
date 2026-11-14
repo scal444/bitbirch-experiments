@@ -3,7 +3,8 @@ paper's Fig 5 / S17.
 
   python scripts/metrics/top_clusters.py [DS ...] [--force]       (default: chembl34 scu ena1m)
 
-For each implementation in the quality comparison, k in {3, 3.5, 4}, input order 0, bf 1024:
+For each implementation in the quality comparison (bblean split-merge: 36 processes), k in {3, 3.5, 4}, input order
+0, bf 1024:
   top_clusters.csv : the 20 largest clusters (ties: lowest first member row): size, unique Murcko scaffolds, iSIM
   size_bins.csv    : clusters with more than 0 / 1 / 10 / 100 / 1000 members (as in the paper's right-hand panels)
 Both under data/quality/ of the results folder. Rows already in the tables are kept; --force recomputes them.
@@ -18,14 +19,8 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.common import paths as P  # noqa: E402
+from scripts.common.implementations import IMPLEMENTATIONS, label_folder  # noqa: E402
 
-MAIN_P = 36  # processes of the bblean split-merge runs in the comparison
-IMPLS = {  # implementation -> label folder under BB_OUT/labels
-    "serial": "bblean_tree",  # bblean serial
-    "batched": "nvmolkit_main",  # nvMolKit batched (GPU)
-    "multiround": f"bblean_mr{MAIN_P}",  # bblean split-merge
-    "bblean_batched": "bblean_batched",  # bblean batched (multithreaded CPU)
-}
 OUT = P.QUALITY
 
 
@@ -53,12 +48,13 @@ def main():
     bins = pd.read_csv(bf_) if bf_.exists() else pd.DataFrame()
     for ds in a.datasets:
         fps = scaf = None
-        for pl, method in IMPLS.items():
+        for impl in IMPLEMENTATIONS:
             for k in P.KS:
-                f = P.label_path(ds, method, k, 0)
+                f = P.label_path(ds, label_folder(impl), k, 0)
                 if not (f.exists() and f.with_suffix(".json").exists()):
                     continue
-                if not a.force and len(top) and ((top.dataset == ds) & (top.player == pl) & (top.k == k)).any():
+                done = len(top) and ((top.dataset == ds) & (top.implementation == impl) & (top.k == k)).any()
+                if done and not a.force:
                     continue
                 if fps is None:
                     fps = np.load(P.DATASETS[ds]["fps"], mmap_mode="r")
@@ -69,19 +65,19 @@ def main():
                 rows = []
                 for rank, c in enumerate(order, 1):
                     mem = np.flatnonzero(inv == c)
-                    rows.append(dict(dataset=ds, player=pl, k=k, seed=0, rank=rank, size=int(sizes[c]),
+                    rows.append(dict(dataset=ds, implementation=impl, k=k, seed=0, rank=rank, size=int(sizes[c]),
                                      unique_scaffolds=int(len(np.unique(scaf[mem]))), isim=isim_rows(fps, mem)))
-                brow = dict(dataset=ds, player=pl, k=k, seed=0, clusters=len(sizes))
+                brow = dict(dataset=ds, implementation=impl, k=k, seed=0, clusters=len(sizes))
                 brow.update({f"gt{b}": int((sizes > b).sum()) for b in BINS})
-                sel = lambda d: (d.dataset == ds) & (d.player == pl) & (d.k == k)  # noqa: E731
+                sel = lambda d: (d.dataset == ds) & (d.implementation == impl) & (d.k == k)  # noqa: E731
                 top = pd.concat([top[~sel(top)] if len(top) else top, pd.DataFrame(rows)], ignore_index=True)
                 bins = pd.concat([bins[~sel(bins)] if len(bins) else bins, pd.DataFrame([brow])],
                                  ignore_index=True)
                 for d, p in ((top, tf), (bins, bf_)):
-                    d.sort_values([c for c in ("dataset", "player", "k", "rank") if c in d]).to_csv(
+                    d.sort_values([c for c in ("dataset", "implementation", "k", "rank") if c in d]).to_csv(
                         p.with_suffix(".tmp"), index=False)
                     os.replace(p.with_suffix(".tmp"), p)
-                print(ds, pl, f"k{k:g}", "top sizes", [r["size"] for r in rows[:5]], flush=True)
+                print(ds, impl, f"k{k:g}", "top sizes", [r["size"] for r in rows[:5]], flush=True)
 
 
 if __name__ == "__main__":

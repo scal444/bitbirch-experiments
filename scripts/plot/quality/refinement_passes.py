@@ -22,8 +22,6 @@ from matplotlib.lines import Line2D  # noqa: E402
 import common as C  # noqa: E402
 from quality import PANELS  # noqa: E402
 
-PLAYER = {"serial": "serial", "batched": "bblean_batched",  # refinement batched runs used bblean batched (multithreaded CPU)
-          "parallel": "multiround", "multiround": "multiround"}
 COLS = [("isim", "within-cluster iSIM"), ("scaffold_purity", "scaffold purity"), ("scaf_ami", "AMI vs scaffolds"),
         ("tgt_ami", "AMI vs targets")]
 PROC = {"rc0": "recluster x10", "rc1": r"recluster (+$\sigma$) x5", "ref": "refine largest x5"}
@@ -35,21 +33,20 @@ def load():
     if not frames:
         return pd.DataFrame(), src
     d = pd.concat(frames, ignore_index=True)
-    d["player"] = d.player.map(PLAYER)
     return d[d.k == 3.5], src
 
 
 def labels(src):
     lab = {p: dict(C.QP[p]) for p in C.QP}
     if C.refine_mr_p() != C.MAIN_P:  # the provisional 10 parts / 10 processes command
-        lab["multiround"]["label"] = f"{C.PAR_NAME} (provisional, P={C.refine_mr_p()})"
+        lab["bblean_split_merge"]["label"] = f"{C.PAR_NAME} (provisional, P={C.refine_mr_p()})"
     return lab
 
 
 def draw(axs_row, d, ds, cols, lab):
     for ax, (col, ylab) in zip(axs_row, cols):
-        for p in ("serial", "multiround", "bblean_batched"):
-            s = d[(d.dataset == ds) & (d.player == p)].sort_values("it")
+        for p in ("bblean_serial", "bblean_split_merge", "bblean_batched"):
+            s = d[(d.dataset == ds) & (d.implementation == p)].sort_values("it")
             if s.empty or s[col].isna().all():
                 continue
             st = lab[p]
@@ -64,7 +61,7 @@ def si_figure(d):
     """Supplement: rc0 passes, every library and measure, mean and 95 % interval over input orders."""
     q = d[d.proc == "rc0"]
     dss = [ds for ds in C.DS_ORDER if ds in set(q.dataset)]
-    players = ["serial", "bblean_batched", "multiround"]
+    impls = ["bblean_serial", "bblean_batched", "bblean_split_merge"]
     fig, axs = plt.subplots(len(dss), len(PANELS), figsize=(C.FULLW, 1.2 * len(dss) + 0.6), squeeze=False)
     its = sorted(q.it.unique())
     for r, ds in enumerate(dss):
@@ -73,8 +70,8 @@ def si_figure(d):
             ax = axs[r, c]
             if not g[col].notna().any():
                 ax.axis("off"); continue
-            for p in players:
-                st = [C.mean_ci(np.asarray(g[(g.player == p) & (g.it == it)][col] * sc, float)) for it in its]
+            for p in impls:
+                st = [C.mean_ci(np.asarray(g[(g.implementation == p) & (g.it == it)][col] * sc, float)) for it in its]
                 m = np.array([t[0] for t in st]); lo = np.array([t[1] for t in st]); hi = np.array([t[2] for t in st])
                 if (g[col].dropna() >= 0).all():
                     lo = np.maximum(lo, 0)
@@ -93,7 +90,7 @@ def si_figure(d):
         vis = [r for r in range(len(dss)) if axs[r, c].axison]
         if vis:
             axs[vis[-1], c].set_xticks([0, 5, 10], ["0", "5", "10"]); axs[vis[-1], c].set_xlabel("pass", fontsize=6)
-    hs = [Line2D([], [], marker="o", lw=0.8, ms=4, color=C.QP[p]["color"], label=C.QP[p]["label"]) for p in players]
+    hs = [Line2D([], [], marker="o", lw=0.8, ms=4, color=C.QP[p]["color"], label=C.QP[p]["label"]) for p in impls]
     fig.tight_layout(rect=(0, 0.035, 1, 1), h_pad=0.5, w_pad=0.3)
     fig.legend(handles=hs, loc="lower center", ncol=3, bbox_to_anchor=(0.5, 0.0), fontsize=6.5)
     C.save(fig, "refinement_passes_all")

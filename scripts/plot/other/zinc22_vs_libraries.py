@@ -34,10 +34,10 @@ def data(k=3.5):
     over = {"zinc22": {m: zo[m] for m, _ in METRICS if m in zo} | {"scaffold_purity": zo.scaffold_purity_pooled_plugin}}
     top = {"zinc22": zt.set_index("k_top")["isim"]}
     for ds in SETS:
-        d = C.load_metrics(ds, bf=C.P.BF)
-        d = d[(d.player == "batched") & (d.k == k)]
-        t = C.load_metrics(ds, topk=True, bf=C.P.BF)
-        t = t[(t.player == "batched") & (t.k == k)]
+        d = C.load_metrics(ds)
+        d = d[(d.implementation == "nvmolkit_batched") & (d.k == k)]
+        t = C.load_metrics(ds, topk=True)
+        t = t[(t.implementation == "nvmolkit_batched") & (t.k == k)]
         if len(d):
             over[ds] = {m: d[m].mean() for m, _ in METRICS}
             top[ds] = t.groupby("k_top")["isim"].mean()

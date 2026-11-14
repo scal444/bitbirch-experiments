@@ -3,14 +3,10 @@
 Data is read only through scripts/common/paths.py (config/). Each loader returns what exists now, so a plot script
 picks up new CSVs when they appear and draws only finished runs.
 
-Implementation keys used in code, with the label folders behind them:
-  serial      bblean serial (`bblean_tree`)
-  multiround  bblean split-merge (bb multiround), P = 36 (`bblean_mr36`)
-  bblean_batched  bblean batched, multithreaded CPU (`bblean_batched`)
-  batched     nvMolKit batched, GPU (`nvmolkit_main`)
-Performance figures call the last two `cpu_batched` and `gpu`. A results folder may also hold
-data/quality/by_run_earlier_labels/ (metrics of earlier labels, methods `bblean` and `nvmolkit`); load_metrics reads
-it where it exists.
+Implementations go by the names of scripts/common/implementations.py everywhere (tables, styles, code):
+bblean_serial, bblean_split_merge (P = 36 in the comparison), bblean_batched (multithreaded CPU), nvmolkit_batched
+(GPU). A results folder may also hold data/quality/by_run_earlier_labels/ (metrics of labels from an earlier run with
+the same partitions); load_metrics reads it where it exists.
 """
 import re
 import sys
@@ -25,10 +21,10 @@ import pandas as pd  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.common import paths as P  # noqa: E402
+from scripts.common.implementations import MAIN_PROCESSES as MAIN_P  # noqa: E402
 
 RESULTS = P.RESULTS
 PLOTS = P.PLOTS
-MAIN_P = 36  # process count of the bblean split-merge runs in the comparison
 
 DS_NAME = {"chembl34": "ChEMBL34", "scu": "SCUBIDOO", "ena1m": "Enamine 1M", "c35": "ChEMBL35 additions",
            "np": "ChEMBL33 NP"}
@@ -38,31 +34,25 @@ DS_ORDER = ["chembl34", "scu", "ena1m", "c35", "np"]
 
 # House colours: colour = method.
 SURFACE, INK, INK2, RULE = "#ffffff", "#0b0b0b", "#52514e", "#d6d5cf"
-BB_SER, BB_PAR = "#eb6834", "#f4a582"           # bblean serial orange, bblean parallel (multiround) light orange
+BB_SER, BB_PAR = "#eb6834", "#f4a582"           # bblean serial orange, bblean split-merge light orange
 BB_SER_REF, BB_PAR_REF = "#a8400f", "#c48a6c"   # refined = darker shade of the same method
 NV, NV_REF = "#76B900", "#4a7a00"               # nvMolKit green, refined dark green
 OURS = "#1f3a68"                                # bblean batched (multithreaded CPU): dark blue
-BUT_SAME, BUT_MATCH = "#8a5cd6", "#bfa3ec"      # Butina violet / light violet (count-matched)
 NEUTRAL, NEUTRAL2, NEUTRAL3 = "#4b6a88", "#9a9893", "#2f2e2b"  # non-method series (datasets, references)
-# old slot names kept for scripts that colour non-method series
-C1, C2, C3, C4, C5, C6, C7 = BB_SER, BB_PAR, NV, NEUTRAL2, BUT_SAME, NEUTRAL3, NEUTRAL
 PAR_NAME = "bblean split-merge"  # bblean's `bb multiround`
 OURS_NAME = "bblean batched"  # nvMolKit's batched algorithm in bblean, multithreaded CPU
 GPU_NAME = "nvMolKit batched (GPU)"
-BATCHED_NAME = "bblean batched = nvMolKit batched"  # quality series: the two give identical clusters
-QP = {  # quality players
-    "serial": dict(label="bblean serial", color=BB_SER, ref=BB_SER_REF, marker="o", hollow=True),
-    "multiround": dict(label=PAR_NAME, color=BB_PAR, ref=BB_PAR_REF, marker="o", hollow=False),
-    "batched": dict(label=GPU_NAME, color=NV, ref=NV_REF, marker="o", hollow=False),
+QP = {  # quality figures: style per implementation
+    "bblean_serial": dict(label="bblean serial", color=BB_SER, ref=BB_SER_REF, marker="o", hollow=True),
+    "bblean_split_merge": dict(label=PAR_NAME, color=BB_PAR, ref=BB_PAR_REF, marker="o", hollow=False),
+    "nvmolkit_batched": dict(label=GPU_NAME, color=NV, ref=NV_REF, marker="o", hollow=False),
     "bblean_batched": dict(label=OURS_NAME, color=OURS, ref=OURS, marker="o", hollow=False),
 }
-QP_SHORT = {"serial": "serial", "multiround": "split-merge", "batched": "nvMolKit", "bblean_batched": "bblean_batched"}
-PP = {  # performance players
-    "serial": dict(label="bblean serial", color=BB_SER, marker="o"),
-    "multiround": dict(label=PAR_NAME, color=BB_PAR, marker="o"),
-    "gpu": dict(label=GPU_NAME, color=NV, marker="o"),
-    "cpu_batched": dict(label=OURS_NAME, color=OURS, marker="o"),
-    "butina": dict(label="nvMolKit Butina", color=BUT_SAME, marker="o"),
+PP = {  # timing figures: style per implementation
+    "bblean_serial": dict(label="bblean serial", color=BB_SER, marker="o"),
+    "bblean_split_merge": dict(label=PAR_NAME, color=BB_PAR, marker="o"),
+    "nvmolkit_batched": dict(label=GPU_NAME, color=NV, marker="o"),
+    "bblean_batched": dict(label=OURS_NAME, color=OURS, marker="o"),
 }
 
 COLW, FULLW = 3.4, 7.0  # inches: narrow / wide figure width
@@ -278,37 +268,12 @@ def waiting(name, what):
     print(f"WAITING {name}: {what}")
 
 
-# ---------------------------------------------------------------- method names -> players
-
-def split_bf(method):
-    m = re.match(r"(.*)_bf(\d+)$", method)
-    return (m.group(1), int(m.group(2))) if m else (method, P.BF)
-
-
-def quality_player(method):
-    """Method folder name (without _bf suffix) -> quality series, or None for methods not in the comparison."""
-    if method in ("bblean", "bblean_tree"):
-        return "serial"
-    if method in ("nvmolkit", "nvmolkit_main"):
-        return "batched"
-    if method == "bblean_batched":
-        return "bblean_batched"
-    if method == f"bblean_mr{MAIN_P}":
-        return "multiround"
-    if method.startswith("butina"):
-        return method  # butina_matched / butina_same, kept as references
-    return None
-
-
-PERF_PLAYER = {"serial": "serial", "multiround": "multiround", "batched": "cpu_batched", "nvmolkit": "gpu"}  # timings.csv
-
-
 # ---------------------------------------------------------------- quality metrics (earlier + new)
 
 def _metric_files(ds, topk):
     name = f"topk_{ds}.csv" if topk else f"{ds}.csv"
-    # by_run_earlier_labels: metrics of the earlier labels reused for orders 0-2 (same partitions as the new labels);
-    # by_run: written by scripts/metrics/metrics.py
+    # by_run_earlier_labels: metrics of labels from an earlier run with the same partitions; by_run: written by
+    # scripts/metrics/metrics.py
     return [P.QUALITY / "by_run_earlier_labels" / name, P.QUALITY / "by_run" / name]
 
 
@@ -317,39 +282,28 @@ def any_metrics(topk=False):
     return any(f.exists() for ds in DS_ORDER for f in _metric_files(ds, topk))
 
 
-def load_metrics(ds, topk=False, bf=None):
-    """Rows of the metrics CSVs for dataset ds, with `player` and `bf` columns; one row per player/bf/k/seed(/k_top).
-
-    bf=None keeps every branching factor; else only that one."""
-    frames = []
-    for i, f in enumerate(_metric_files(ds, topk)):
-        if f.exists():
-            d = pd.read_csv(f)
-            d["source"] = "bp" if i == 0 else "new"
-            frames.append(d)
+def load_metrics(ds, topk=False):
+    """Rows of the metrics CSVs for dataset ds, one per implementation/k/seed(/k_top); bblean split-merge at MAIN_P
+    processes only."""
+    frames = [pd.read_csv(f, dtype={"processes": "Int64"}).assign(_earlier=i == 0)
+              for i, f in enumerate(_metric_files(ds, topk)) if f.exists()]
     if not frames:
         return pd.DataFrame()
     d = pd.concat(frames, ignore_index=True)
-    sp = d["method"].map(split_bf)
-    d["base"] = [s[0] for s in sp]
-    d["bf"] = [s[1] for s in sp]
-    d["player"] = d["base"].map(quality_player)
-    d = d[d["player"].notna()]
-    key = ["player", "bf", "k", "seed"] + (["k_top"] if topk else [])
-    # serial: `bblean_tree` first, earlier `bblean` only as fallback; other implementations: earlier labels first
-    # (same partitions)
-    d["_pri"] = np.where(d["method"] == "bblean_tree", 0, np.where(d["source"] == "bp", 1, 2))
-    d = d.sort_values("_pri", kind="stable").drop_duplicates(key, keep="first").drop(columns="_pri")
-    if bf is not None:
-        d = d[d["bf"] == bf]
-    return d.reset_index(drop=True)
+    d = d[d.processes.isna() | (d.processes == MAIN_P)]
+    # on duplicates (same partitions) keep: bblean serial from by_run, the others from the earlier labels; this order
+    # also fixes the order of the runs, which sets the jitter of the strip plots
+    d["_pri"] = np.where(~d._earlier & (d.implementation == "bblean_serial"), 0, np.where(d._earlier, 1, 2))
+    key = ["implementation", "bf", "k", "seed"] + (["k_top"] if topk else [])
+    d = d.sort_values("_pri", kind="stable").drop_duplicates(key, keep="first")
+    return d.drop(columns=["_pri", "_earlier"]).reset_index(drop=True)
 
 
-def players_present(d, order=("serial", "multiround", "bblean_batched", "batched")):
-    return [p for p in order if p in set(d.get("player", []))]
+def implementations_present(d, order=("bblean_serial", "bblean_split_merge", "bblean_batched", "nvmolkit_batched")):
+    return [p for p in order if p in set(d.get("implementation", []))]
 
 
-def agg_seeds(d, cols, by=("player", "bf", "k")):
+def agg_seeds(d, cols, by=("implementation", "bf", "k")):
     """Mean, min and max over seeds."""
     g = d.groupby(list(by))[cols]
     out = g.mean().add_suffix("_mean").join(g.min().add_suffix("_min")).join(g.max().add_suffix("_max"))
@@ -357,8 +311,8 @@ def agg_seeds(d, cols, by=("player", "bf", "k")):
     return out.reset_index()
 
 
-def errbar(ax, x, mean, lo, hi, p, players=QP, line=True, **kw):
-    st = players[p]
+def errbar(ax, x, mean, lo, hi, p, impls=QP, line=True, **kw):
+    st = impls[p]
     yerr = np.vstack([np.asarray(mean) - np.asarray(lo), np.asarray(hi) - np.asarray(mean)])
     if st.get("hollow"):
         kw.setdefault("markerfacecolor", SURFACE)
@@ -384,36 +338,34 @@ PERF_DS = {"ena1m": "Enamine 1M", "chembl34": "ChEMBL34", "ena10m": "Enamine 10M
            "zinc25m": "ZINC20 25M", "zinc50m": "ZINC20 50M", "zinc101m": "ZINC20 101M"}
 
 
-def load_perf(all_bf=False):
-    """Rows of data/timing/timings.csv (scripts/run/perf_run.py writes it) as: player, dataset, n, threads (threads for
-    bblean batched, processes for split-merge), seconds (best of repeats), peak_gib (GPU pool for nvMolKit, host peak
-    RSS otherwise), gpu_input_gib. k 3.5 only; bf 1024 only unless all_bf. Rows with `superseded` = True are skipped."""
+def load_perf():
+    """Rows of data/timing/timings.csv (scripts/run/perf_run.py writes it) as: implementation, dataset, n, threads
+    (threads for bblean batched, processes for split-merge), seconds (best of repeats), peak_gib (GPU pool for nvMolKit,
+    host peak RSS otherwise), gpu_input_gib. k 3.5 and bf 1024 only. Rows with `superseded` = True are skipped."""
     f = P.TIMING / "timings.csv"
     if not f.exists():
         return pd.DataFrame()
     d = pd.read_csv(f)
-    out = pd.DataFrame({"player": d["player"].map(PERF_PLAYER), "dataset": d["set"].astype(str),
+    out = pd.DataFrame({"implementation": d["implementation"], "dataset": d["set"].astype(str),
                         "n": d["n"], "threads": d["threads"].fillna(d["processes"]), "seconds": d["seconds_min"]})
-    gpu_row = out["player"].eq("gpu")
+    gpu_row = out["implementation"].eq("nvmolkit_batched")
     out["gpu_input_gib"] = d["gpu_input_gib"]
     out["peak_gib"] = d["gpu_pool_peak_gib"].where(gpu_row, d["host_peak_gib"])
     out["bf"], out["k"], out["when"] = d["bf"], d["k"], d["when"]
     ok = ~d["superseded"].astype(str).str.lower().eq("true") if "superseded" in d else True
-    out = out[ok & out.player.notna() & out.seconds.notna() & (out.k == 3.5)]
-    if not all_bf:
-        out = out[out.bf == P.BF]
-    key = ["player", "dataset", "n", "threads", "bf"]
+    out = out[ok & out.implementation.isin(list(PP)) & out.seconds.notna() & (out.k == 3.5) & (out.bf == P.BF)]
+    key = ["implementation", "dataset", "n", "threads", "bf"]
     # one row per setting: the latest run (each row is already the best of its repeats)
     out = out.sort_values("when").drop_duplicates(key, keep="last")
     return out[key + ["seconds", "peak_gib", "gpu_input_gib"]].reset_index(drop=True)
 
 
 def main_setting(perf):
-    """One row per player and size at the main setting: serial 1 thread, multiround and CPU batched at
-    MAIN_P (36) processes/threads (or their only setting), GPU and Butina as measured."""
+    """One row per implementation and size at the main setting: bblean serial 1 thread, split-merge and bblean batched
+    at MAIN_P (36) processes/threads (or their only setting), nvMolKit as measured."""
     rows = []
-    for (p, ds, n), g in perf.groupby(["player", "dataset", "n"]):
-        if p in ("multiround", "cpu_batched") and g.threads.notna().any():
+    for (p, ds, n), g in perf.groupby(["implementation", "dataset", "n"]):
+        if p in ("bblean_split_merge", "bblean_batched") and g.threads.notna().any():
             g = g[g.threads == MAIN_P] if (g.threads == MAIN_P).any() else g.iloc[:0]
         if len(g):
             rows.append(g.sort_values("seconds").iloc[0])
@@ -446,14 +398,14 @@ def family(ds):
     return str(ds), "-."
 
 
-def plot_vs_n(ax, m, col, players=None):
-    """col against N, one colour per player; sizes of one data family joined by a line (style = family), since
+def plot_vs_n(ax, m, col, impls=None):
+    """col against N, one colour per implementation; sizes of one data family joined by a line (style = family), since
     subsets of one library are one knob and different libraries are not."""
     from matplotlib.lines import Line2D
     from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
     used = {}
-    for p in players or PP:
-        s = m[(m.player == p)].dropna(subset=[col])
+    for p in impls or PP:
+        s = m[(m.implementation == p)].dropna(subset=[col])
         for fam, g in s.groupby(s.dataset.map(lambda x: family(x)[0])):
             ls = family(g.dataset.iloc[0])[1]
             g = g.sort_values("n")
@@ -471,7 +423,7 @@ def plot_vs_n(ax, m, col, players=None):
     if len(used) < 2:
         used = {}
     handles = [Line2D([], [], color=PP[p]["color"], marker=PP[p]["marker"], ls="none", label=PP[p]["label"])
-               for p in (players or PP) if (m.player == p).any()]
+               for p in (impls or PP) if (m.implementation == p).any()]
     handles += [Line2D([], [], color="0.4", ls=ls, label=fam) for fam, ls in used.items()]
     return handles
 
@@ -480,18 +432,18 @@ def plot_vs_n(ax, m, col, players=None):
 # bblean batched and nvMolKit batched give identical clusters, so their points coincide. bblean batched is drawn as a
 # larger open ring under a smaller filled nvMolKit dot, so both stay visible. Use with ax.plot(..., marker="o", **overlay("bblean_batched")).
 OVERLAY = {"bblean_batched": dict(markersize=6.0, markerfacecolor="none", markeredgewidth=1.1, zorder=3),
-           "batched": dict(markersize=2.8, markeredgewidth=0, zorder=4)}
+           "nvmolkit_batched": dict(markersize=2.8, markeredgewidth=0, zorder=4)}
 
 
 def overlay(p, ms_scale=1.0):
-    """Marker kwargs for ax.plot / errorbar: ring for bblean batched, small dot for nvMolKit, {} for other players."""
+    """Marker kwargs for ax.plot / errorbar: ring for bblean batched, small dot for nvMolKit, {} for the others."""
     kw = dict(OVERLAY.get(p, {}))
     if "markersize" in kw:
         kw["markersize"] *= ms_scale
     return kw
 
 
-def panel_label(p, players=None):
+def panel_label(p, impls=None):
     """Implementation name wrapped onto two lines for a narrow panel title ("bblean parallel:\nsplit-merge")."""
-    lab = (players or QP)[p]["label"]
+    lab = (impls or QP)[p]["label"]
     return lab.replace(": ", ":\n").replace(" (GPU)", "\n(GPU)")

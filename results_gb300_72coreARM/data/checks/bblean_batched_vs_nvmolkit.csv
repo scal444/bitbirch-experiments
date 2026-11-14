@@ -1,8 +1,65 @@
-dataset,k,seed,clusters_bblean_batched,clusters_nvmolkit,same_partition
-chembl34,3.5,3,158794,158794,True
-chembl34,3.5,4,165389,165389,True
-chembl34,3.5,5,154183,154183,True
-chembl34,3.5,6,172570,172570,True
-chembl34,3.5,7,165804,165804,True
-chembl34,3.5,8,156180,156180,True
-chembl34,3.5,9,161826,161826,True
+dataset,k,seed,clusters_bblean_batched,clusters_nvmolkit_batched,nvmolkit_build,same_partition
+c35,3.0,0,5135,5135,earlier development build,True
+c35,3.0,1,5396,5396,earlier development build,True
+c35,3.0,2,5406,5406,earlier development build,True
+c35,3.0,3,4354,4354,earlier development build,True
+c35,3.0,4,4322,4322,earlier development build,True
+c35,3.5,0,7657,7657,earlier development build,True
+c35,3.5,1,6555,6555,earlier development build,True
+c35,3.5,2,7717,7717,earlier development build,True
+c35,3.5,3,6304,6304,earlier development build,True
+c35,3.5,4,5594,5594,earlier development build,True
+c35,4.0,0,8316,8316,earlier development build,True
+c35,4.0,1,10012,10012,earlier development build,True
+c35,4.0,2,8044,8044,earlier development build,True
+c35,4.0,3,8662,8662,earlier development build,True
+c35,4.0,4,9275,9275,earlier development build,True
+chembl34,3.0,0,89005,89005,earlier development build,True
+chembl34,3.0,1,109245,109245,earlier development build,True
+chembl34,3.0,2,97849,97849,earlier development build,True
+chembl34,3.5,0,151137,151137,earlier development build,True
+chembl34,3.5,1,160612,160612,earlier development build,True
+chembl34,3.5,2,173602,173602,earlier development build,True
+chembl34,3.5,3,158794,158794,763b923,True
+chembl34,3.5,4,165389,165389,763b923,True
+chembl34,3.5,5,154183,154183,763b923,True
+chembl34,3.5,6,172570,172570,763b923,True
+chembl34,3.5,7,165804,165804,763b923,True
+chembl34,3.5,8,156180,156180,763b923,True
+chembl34,3.5,9,161826,161826,763b923,True
+chembl34,4.0,0,234092,234092,earlier development build,True
+chembl34,4.0,1,236169,236169,earlier development build,True
+chembl34,4.0,2,266904,266904,earlier development build,True
+ena1m,3.0,0,86720,86720,earlier development build,True
+ena1m,3.0,1,85240,85240,earlier development build,True
+ena1m,3.0,2,80692,80692,earlier development build,True
+ena1m,3.5,0,172994,172994,earlier development build,True
+ena1m,3.5,1,177499,177499,earlier development build,True
+ena1m,3.5,2,162196,162196,earlier development build,True
+ena1m,4.0,0,252169,252169,earlier development build,True
+ena1m,4.0,1,253611,253611,earlier development build,True
+ena1m,4.0,2,247367,247367,earlier development build,True
+np,3.0,0,19497,19497,earlier development build,True
+np,3.0,1,17523,17523,earlier development build,True
+np,3.0,2,18355,18355,earlier development build,True
+np,3.0,3,18149,18149,earlier development build,True
+np,3.0,4,18451,18451,earlier development build,True
+np,3.5,0,24465,24465,earlier development build,True
+np,3.5,1,24632,24632,earlier development build,True
+np,3.5,2,25335,25335,earlier development build,True
+np,3.5,3,25402,25402,earlier development build,True
+np,3.5,4,24051,24051,earlier development build,True
+np,4.0,0,31432,31432,earlier development build,True
+np,4.0,1,31277,31277,earlier development build,True
+np,4.0,2,29565,29565,earlier development build,True
+np,4.0,3,31596,31596,earlier development build,True
+np,4.0,4,31469,31469,earlier development build,True
+scu,3.0,0,6331,6331,earlier development build,True
+scu,3.0,1,6926,6926,earlier development build,True
+scu,3.0,2,5251,5251,earlier development build,True
+scu,3.5,0,11469,11469,earlier development build,True
+scu,3.5,1,11088,11088,earlier development build,True
+scu,3.5,2,9547,9547,earlier development build,True
+scu,4.0,0,19853,19853,earlier development build,True
+scu,4.0,1,18152,18152,earlier development build,True
+scu,4.0,2,17071,17071,earlier development build,True

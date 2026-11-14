@@ -19,7 +19,7 @@ import pandas as pd  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 import common as C  # noqa: E402
 
-PLAYERS = ["serial", "bblean_batched", "batched", "multiround"]
+IMPLS = ["bblean_serial", "bblean_batched", "nvmolkit_batched", "bblean_split_merge"]
 MAIN_DS = "chembl34"  # representative library: the only one with both scaffolds and targets at full size
 PANELS = [("isim", "Within-cluster iSIM ↑", 1),
           ("scaffold_purity", "Scaffold purity ↑", 1), ("singleton_fraction", "Singletons (%)", 100),
@@ -36,8 +36,8 @@ W = 0.19
 def strips(ax, d, dss, col, sc, rng):
     shown = [ds for ds in dss if d[(d.dataset == ds)][col].notna().any()]
     for i, ds in enumerate(shown):
-        for j, p in enumerate(PLAYERS):
-            v = d[(d.dataset == ds) & (d.player == p)][col] * sc
+        for j, p in enumerate(IMPLS):
+            v = d[(d.dataset == ds) & (d.implementation == p)][col] * sc
             C.strip(ax, i + (j - 1.5) * W, v, C.QP[p]["color"], width=W * 0.8, s=6, rng=rng)
     ax.set_xticks(range(len(shown)), [C.DS_NAME[ds] for ds in shown], fontsize=5.5, rotation=40, ha="right",
                   rotation_mode="anchor")
@@ -47,15 +47,15 @@ def strips(ax, d, dss, col, sc, rng):
 
 def one_library(ax, d, ds, col, sc):
     """x = implementation, mean and 95 % interval over input orders, linear axis."""
-    for j, p in enumerate(PLAYERS):
-        C.mean_point(ax, j, d[(d.dataset == ds) & (d.player == p)][col] * sc, C.QP[p]["color"])
-    ax.set_xticks([]); ax.set_xlim(-0.6, len(PLAYERS) - 0.4)
+    for j, p in enumerate(IMPLS):
+        C.mean_point(ax, j, d[(d.dataset == ds) & (d.implementation == p)][col] * sc, C.QP[p]["color"])
+    ax.set_xticks([]); ax.set_xlim(-0.6, len(IMPLS) - 0.4)
     ax.grid(axis="x", visible=False)
 
 
 def handles():
     return [Line2D([], [], marker="o", ls="none", color=C.QP[p]["color"], ms=5, label=C.QP[p]["label"])
-            for p in PLAYERS]
+            for p in IMPLS]
 
 
 def legend(fig):
@@ -65,11 +65,11 @@ def legend(fig):
 
 def main():
     C.style()
-    frames = [C.load_metrics(ds, bf=C.P.BF) for ds in C.DS_ORDER]
+    frames = [C.load_metrics(ds) for ds in C.DS_ORDER]
     d = pd.concat([f for f in frames if len(f)], ignore_index=True) if any(len(f) for f in frames) else pd.DataFrame()
     if d.empty:
         C.waiting("quality_chembl34", "per-run metrics in data/quality/by_run"); return
-    d = d[d.player.isin(PLAYERS) & (d.k == K)]
+    d = d[d.implementation.isin(IMPLS) & (d.k == K)]
     dss = [ds for ds in C.DS_ORDER if ds in set(d.dataset)]
     rng = np.random.default_rng(0)
     fig, axs = plt.subplots(2, 4, figsize=(C.FULLW, 3.4))  # ChEMBL34; legend in the eighth slot

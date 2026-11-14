@@ -1,14 +1,14 @@
-dataset,method,k,seed,threshold,bf,batch_size,threads,seconds,clusters,same_partition_as_bp
-c35,bblean_batched,3.5,0,0.271212,1024,4096,16,0.243,7657,bp_nvmolkit=True
-c35,bblean_mr8,3.5,0,0.271212,1024,,8,1.632,5171,
-c35,bblean_tree,3.5,0,0.271212,1024,,,0.58,6157,bp_bblean=True
-c35,nvmolkit_main,3.5,0,0.271212,1024,4096,,0.371,7657,bp_nvmolkit=True
-chembl34,bblean_batched,3.5,0,0.25378,1024,4096,36,1.797,151137,bp_nvmolkit=True
-chembl34,bblean_mr36,3.5,0,0.25378,1024,,36,18.518,272185,
-chembl34,bblean_mr36_upstream,3.5,0,0.25378,1024,,36,80.773,272185,
-chembl34,bblean_tree,3.5,0,0.25378,1024,,,28.479,174948,bp_bblean=True
-chembl34,nvmolkit_main,3.5,0,0.25378,1024,4096,,1.131,151137,bp_nvmolkit=True
-chembl34,nvmolkit_main_b1024,3.5,0,0.25378,1024,1024,,1.283,175810,
-np,bblean_batched,3.5,0,0.730166,1024,4096,16,0.397,24465,bp_nvmolkit=True
-np,bblean_tree,3.5,0,0.730166,1024,,,1.403,22500,bp_bblean=True
-np,nvmolkit_main,3.5,0,0.730166,1024,4096,,0.377,24465,bp_nvmolkit=True
+dataset,implementation,processes,build,k,seed,threshold,bf,batch_size,threads,seconds,clusters,same_partition_as_earlier_labels
+c35,bblean_batched,,cpp-tree-batched bdad1b3,3.5,0,0.271212,1024,4096,16,0.243,7657,True
+c35,bblean_split_merge,8,cpp-tree a2deb39,3.5,0,0.271212,1024,,8,1.632,5171,
+c35,bblean_serial,,cpp-tree a2deb39,3.5,0,0.271212,1024,,,0.58,6157,True
+c35,nvmolkit_batched,,nvMolKit 763b923,3.5,0,0.271212,1024,4096,,0.371,7657,True
+chembl34,bblean_batched,,cpp-tree-batched bdad1b3,3.5,0,0.25378,1024,4096,36,1.797,151137,True
+chembl34,bblean_split_merge,36,cpp-tree a2deb39,3.5,0,0.25378,1024,,36,18.518,272185,
+chembl34,bblean_split_merge,36,bblean 0.10.3,3.5,0,0.25378,1024,,36,80.773,272185,
+chembl34,bblean_serial,,cpp-tree a2deb39,3.5,0,0.25378,1024,,,28.479,174948,True
+chembl34,nvmolkit_batched,,nvMolKit 763b923,3.5,0,0.25378,1024,4096,,1.131,151137,True
+chembl34,nvmolkit_batched,,nvMolKit 763b923,3.5,0,0.25378,1024,1024,,1.283,175810,
+np,bblean_batched,,cpp-tree-batched bdad1b3,3.5,0,0.730166,1024,4096,16,0.397,24465,True
+np,bblean_serial,,cpp-tree a2deb39,3.5,0,0.730166,1024,,,1.403,22500,True
+np,nvmolkit_batched,,nvMolKit 763b923,3.5,0,0.730166,1024,4096,,0.377,24465,True

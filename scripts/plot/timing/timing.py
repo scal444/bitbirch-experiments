@@ -16,10 +16,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
 import common as C  # noqa: E402
 
-SIZE_PLAYERS = ["serial", "multiround", "cpu_batched", "gpu"]
+SIZE_IMPLS = ["bblean_serial", "bblean_split_merge", "bblean_batched", "nvmolkit_batched"]
 MAIN_SWEEP = "ena10m"  # the ChEMBL34 sweep is a secondary figure
 SI_SWEEP = "chembl34"
 
@@ -32,8 +31,8 @@ def threshold(s):
 def size_panel(ax, m, col, unit):
     items = []
     last = {}
-    for p in SIZE_PLAYERS:
-        g = m[m.player == p].dropna(subset=[col]).sort_values("n")
+    for p in SIZE_IMPLS:
+        g = m[m.implementation == p].dropna(subset=[col]).sort_values("n")
         if g.empty:
             continue
         st = C.PP[p]
@@ -50,12 +49,13 @@ def size_panel(ax, m, col, unit):
 
 
 def workers_panel(ax, perf, ds, loglog=False):
-    g_b = perf[(perf.player == "cpu_batched") & (perf.dataset == ds)].dropna(subset=["threads"]).sort_values("threads")
-    g_m = perf[(perf.player == "multiround") & (perf.dataset == ds)].dropna(subset=["threads"]).sort_values("threads")
-    ser = perf[(perf.player == "serial") & (perf.dataset == ds)]
-    gpu = perf[(perf.player == "gpu") & (perf.dataset == ds)]
+    sweep = lambda p: perf[(perf.implementation == p) & (perf.dataset == ds)].dropna(subset=["threads"])  # noqa: E731
+    g_b = sweep("bblean_batched").sort_values("threads")
+    g_m = sweep("bblean_split_merge").sort_values("threads")
+    ser = perf[(perf.implementation == "bblean_serial") & (perf.dataset == ds)]
+    gpu = perf[(perf.implementation == "nvmolkit_batched") & (perf.dataset == ds)]
     items = []
-    for g, p in ((g_m, "multiround"), (g_b, "cpu_batched")):
+    for g, p in ((g_m, "bblean_split_merge"), (g_b, "bblean_batched")):
         if len(g):
             st = C.PP[p]
             ax.plot(g.threads, g.seconds, color=st["color"], marker="o", ms=3)
@@ -64,12 +64,13 @@ def workers_panel(ax, perf, ds, loglog=False):
     if len(gpu):
         v = gpu.seconds.min()
         ax.plot([1, 72], [v, v], color=C.NV, lw=1.2, ls="--")
-        items.append((72, v, f"{C.PP['gpu']['label']}  {C.fmt_s(v)}", C.NV))
+        items.append((72, v, f"{C.PP['nvmolkit_batched']['label']}  {C.fmt_s(v)}", C.NV))
     if len(ser):
         v = ser.seconds.min()
         ring = dict(mfc="none", mew=1.2, ms=7, zorder=2)
         ax.plot([1], [v], marker="o", color=C.BB_SER, ls="none", **ring)  # ring: the 1-worker points stay visible
-        ax.annotate(f"{C.PP['serial']['label']}  {C.fmt_s(v)}", (1, v), xytext=(12, 12), textcoords="offset points",
+        ax.annotate(f"{C.PP['bblean_serial']['label']}  {C.fmt_s(v)}", (1, v), xytext=(12, 12),
+                    textcoords="offset points",
                     color=C.BB_SER, fontsize=6.5, fontweight="bold", va="center",
                     arrowprops=dict(arrowstyle="-", color=C.BB_SER, lw=0.6, shrinkA=0, shrinkB=3))
     ax.set_xlabel("CPU threads / processes")
@@ -115,7 +116,7 @@ def main():
 
     fig, ax = plt.subplots(figsize=(C.COLW, 2.6))  # memory against size
     mm = m.copy()  # nvMolKit: GPU pool peak plus the device copy of the input, as host peak RSS includes it for the CPU
-    g = mm.player == "gpu"
+    g = mm.implementation == "nvmolkit_batched"
     mm.loc[g, "peak_gib"] = mm.loc[g, "peak_gib"] + mm.loc[g, "gpu_input_gib"]
     items, _ = size_panel(ax, mm, "peak_gib", "GiB")
     ax.set_ylim(1, 100); C.plain_log(ax)

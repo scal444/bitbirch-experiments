@@ -18,16 +18,16 @@ def main(k=3.5):
     if not C.any_metrics(topk=True):
         C.waiting("topk", "per-run metrics in data/quality/by_run"); return
     for ds in C.DS_ORDER:
-        d = C.load_metrics(ds, topk=True, bf=C.P.BF)
-        d = d[d.player.isin(list(C.QP)) & (d.k == k)]
+        d = C.load_metrics(ds, topk=True)
+        d = d[d.implementation.isin(list(C.QP)) & (d.k == k)]
         if d.empty:
             continue
         cols = [c for c in COLS if d[c[0]].notna().any()]
-        a = C.agg_seeds(d, [c[0] for c in cols], by=("player", "k_top"))
+        a = C.agg_seeds(d, [c[0] for c in cols], by=("implementation", "k_top"))
         fig, axs = plt.subplots(1, len(cols), figsize=(C.FULLW * len(cols) / 4, 1.8), squeeze=False)
         for ax, (col, lab) in zip(axs[0], cols):
-            for p in C.players_present(a):
-                s = a[a.player == p].sort_values("k_top")
+            for p in C.implementations_present(a):
+                s = a[a.implementation == p].sort_values("k_top")
                 C.errbar(ax, s.k_top, s[col + "_mean"], s[col + "_min"], s[col + "_max"], p)
             ax.set_xscale("log")
             ax.set_xticks([5, 20, 100, 1000], ["5", "20", "100", "1000"])

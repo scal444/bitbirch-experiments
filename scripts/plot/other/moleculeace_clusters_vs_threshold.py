@@ -24,7 +24,7 @@ def main(name="CHEMBL262_Ki"):
     fig, axs = plt.subplots(1, len(mins), figsize=(C.FULLW, 1.8), squeeze=False)
     for ax, m in zip(axs[0], mins):
         for p, st in M.QSTYLE.items():
-            s = d[(d.player == p) & (d.min_size == m)].groupby("threshold").clusters_kept.mean()
+            s = d[(d.implementation == p) & (d.min_size == m)].groupby("threshold").clusters_kept.mean()
             if len(s):
                 ax.plot(s.index, s.values, marker=st["marker"], color=st["color"], label=st["label"], **M.mkw(p))
         ax.set_title(f"{m}+ members", fontsize=7)

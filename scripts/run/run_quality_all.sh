@@ -6,8 +6,8 @@
 #
 # Stages:
 #   labels   labels of the four implementations for every dataset x k {3, 3.5, 4} x input order, ChEMBL34 orders 3-9
-#            at k = 3.5, split-merge at P = 10 / 72 on two sets, nvMolKit at bf 254 (k = 3.5); then the check that
-#            bblean batched and nvMolKit batched give the same partitions
+#            at k = 3.5, split-merge at P = 10 / 72 on two sets; then the check that bblean batched and nvMolKit
+#            batched give the same partitions
 #   metrics  quality metrics per run, the combined tables, the largest-cluster tables, and the agreement between
 #            runs on different input orders, within and across implementations (data/quality/agreement.csv)
 #   moleculeace  MoleculeACE runs (30 sets x 11 thresholds) and their CH / DB / Dunn indices
@@ -30,14 +30,13 @@ run() { echo "+ $*"; "$@" || echo "FAILED: $*"; }
 
 stage_labels() {
   for ds in $DATASETS; do
-    run python $R/run_bblean.py serial "$ds"
-    run python $R/run_bblean.py batched "$ds" --threads "$THREADS"
+    run python $R/run_bblean.py bblean_serial "$ds"
+    run python $R/run_bblean.py bblean_batched "$ds" --threads "$THREADS"
     run python $R/run_nvmolkit.py "$ds"
     run python $R/run_bblean_multiround.py "$ds" --files "$P_MAIN" --ps "$P_MAIN"
-    run python $R/run_nvmolkit.py "$ds" 3.5 --bf 254 --method nvmolkit_main_bf254
   done
-  run python $R/run_bblean.py serial chembl34 3.5 --seeds $EXTRA_ORDERS
-  run python $R/run_bblean.py batched chembl34 3.5 --seeds $EXTRA_ORDERS --threads "$THREADS"
+  run python $R/run_bblean.py bblean_serial chembl34 3.5 --seeds $EXTRA_ORDERS
+  run python $R/run_bblean.py bblean_batched chembl34 3.5 --seeds $EXTRA_ORDERS --threads "$THREADS"
   run python $R/run_nvmolkit.py chembl34 3.5 --seeds $EXTRA_ORDERS
   run python $R/run_bblean_multiround.py chembl34 3.5 --seeds $EXTRA_ORDERS --files "$P_MAIN" --ps "$P_MAIN"
   for P in 10 72; do for ds in chembl34 scu; do
@@ -56,7 +55,7 @@ stage_metrics() {
 }
 
 stage_moleculeace() {
-  run python $R/run_moleculeace.py bblean_tree bblean_mr10 nvmolkit_main
+  run python $R/run_moleculeace.py bblean_serial bblean_split_merge nvmolkit_batched
   run python $R/run_moleculeace.py bblean_batched
   run python scripts/metrics/moleculeace_metrics.py
 }
@@ -64,12 +63,12 @@ stage_moleculeace() {
 stage_refine() {
   local rp=scripts/refinement
   for ds in $DATASETS; do for s in 0 1 2; do
-    run python $rp/run_refine.py "$ds" --seed "$s" --players serial,parallel
-    run python $rp/run_refine.py "$ds" --seed "$s" --players batched
+    run python $rp/run_refine.py "$ds" --seed "$s" --implementations bblean_serial,bblean_split_merge
+    run python $rp/run_refine.py "$ds" --seed "$s" --implementations bblean_batched
   done; done
   for s in $EXTRA_ORDERS; do
-    run python $rp/run_refine.py chembl34 --seed "$s" --players serial,parallel
-    run python $rp/run_refine.py chembl34 --seed "$s" --players batched
+    run python $rp/run_refine.py chembl34 --seed "$s" --implementations bblean_serial,bblean_split_merge
+    run python $rp/run_refine.py chembl34 --seed "$s" --implementations bblean_batched
   done
   run python $rp/analyze.py $DATASETS --seeds 0,1,2 --quality-seeds 0,1,2
   run python $rp/analyze.py chembl34 --seeds 0,1,2,3,4,5,6,7,8,9 --quality-seeds 0,1,2,3,4,5,6,7,8,9

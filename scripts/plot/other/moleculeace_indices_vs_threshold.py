@@ -24,7 +24,7 @@ def main(name="CHEMBL233_Ki"):
     fig, axs = plt.subplots(1, len(idx), figsize=(C.FULLW, 1.9), squeeze=False)
     for ax, (col, lab) in zip(axs[0], idx):
         for p, st in M.QSTYLE.items():
-            g = d[d.player == p].groupby("threshold")[col]
+            g = d[d.implementation == p].groupby("threshold")[col]
             mean, sd = g.mean(), g.std().fillna(0)
             if len(mean):
                 ax.errorbar(mean.index, mean.values, yerr=sd.values, marker=st["marker"], color=st["color"],

@@ -25,28 +25,28 @@ def main():
     if not C.any_metrics(topk=False):
         C.waiting("quality_vs_k", "per-run metrics in data/quality/by_run"); return
     for ds in C.DS_ORDER:
-        d = C.load_metrics(ds, bf=C.P.BF)
-        d = d[d.player.isin(list(C.QP)) & d.k.isin(list(C.P.KS))]
+        d = C.load_metrics(ds)
+        d = d[d.implementation.isin(list(C.QP)) & d.k.isin(list(C.P.KS))]
         if d.empty:
             continue
         panels = [p for p in PANELS if d[p[0]].notna().any()]
-        players = C.players_present(d)
+        impls = C.implementations_present(d)
         fig, axs = plt.subplots(1, len(panels), figsize=(C.FULLW, 1.9), squeeze=False)
         rng = np.random.default_rng(0)
         for ax, (col, title, sc) in zip(axs[0], panels):
-            for j, p in enumerate(players):
+            for j, p in enumerate(impls):
                 st = C.QP[p]
                 xs, ms = [], []
                 for k in C.P.KS:
-                    x = k + (j - (len(players) - 1) / 2) * W
-                    ms.append(C.strip(ax, x, d[(d.player == p) & (d.k == k)][col] * sc, st["color"],
+                    x = k + (j - (len(impls) - 1) / 2) * W
+                    ms.append(C.strip(ax, x, d[(d.implementation == p) & (d.k == k)][col] * sc, st["color"],
                                       hollow=st["hollow"], width=W * 0.9, s=6, rng=rng))
                     xs.append(x)
                 ax.plot(xs, ms, color=st["color"], lw=0.8, zorder=1)
             ax.set_xticks(list(C.P.KS), [f"{k:g}" for k in C.P.KS])
             ax.set_xlabel("k"); ax.set_title(title, fontsize=7)
         hs = [Line2D([], [], marker="o", ls="none", color=C.QP[p]["color"], ms=4,
-                     mfc="none" if C.QP[p]["hollow"] else C.QP[p]["color"], label=C.QP[p]["label"]) for p in players]
+                     mfc="none" if C.QP[p]["hollow"] else C.QP[p]["color"], label=C.QP[p]["label"]) for p in impls]
         fig.suptitle(f"{C.DS_NAME[ds]}, threshold iSIM + kσ", x=0.01, y=0.99, ha="left", fontsize=8.5, fontweight="bold")
         fig.tight_layout(rect=(0, 0.07, 1, 0.97), w_pad=0.6)
         fig.legend(handles=hs, loc="lower center", ncol=len(hs), bbox_to_anchor=(0.5, 0.0))
@@ -59,12 +59,12 @@ SI_W = 0.1
 
 def all_libraries():
     """Every library in one figure, mean and 95 % interval per implementation and k."""
-    frames = {ds: C.load_metrics(ds, bf=C.P.BF) for ds in C.DS_ORDER}
-    frames = {ds: d[d.player.isin(list(C.QP)) & d.k.isin(list(C.P.KS))] for ds, d in frames.items() if len(d)}
+    frames = {ds: C.load_metrics(ds) for ds in C.DS_ORDER}
+    frames = {ds: d[d.implementation.isin(list(C.QP)) & d.k.isin(list(C.P.KS))] for ds, d in frames.items() if len(d)}
     dss = [ds for ds in C.DS_ORDER if ds in frames and len(frames[ds])]
     if not dss:
         return
-    players = ["serial", "bblean_batched", "batched", "multiround"]
+    impls = ["bblean_serial", "bblean_batched", "nvmolkit_batched", "bblean_split_merge"]
     fig, axs = plt.subplots(len(dss), len(SI_PANELS), figsize=(C.FULLW, 1.25 * len(dss) + 0.5), squeeze=False)
     for r, ds in enumerate(dss):
         d = frames[ds]
@@ -72,11 +72,12 @@ def all_libraries():
             ax = axs[r, c]
             if not d[col].notna().any():
                 ax.axis("off"); continue
-            for j, p in enumerate(players):
+            for j, p in enumerate(impls):
                 xs, ms = [], []
                 for k in C.P.KS:
-                    x = k + (j - (len(players) - 1) / 2) * SI_W
-                    ms.append(C.mean_point(ax, x, d[(d.player == p) & (d.k == k)][col] * sc, C.QP[p]["color"], ms=3.5))
+                    x = k + (j - (len(impls) - 1) / 2) * SI_W
+                    v = d[(d.implementation == p) & (d.k == k)][col] * sc
+                    ms.append(C.mean_point(ax, x, v, C.QP[p]["color"], ms=3.5))
                     xs.append(x)
                 ax.plot(xs, ms, color=C.QP[p]["color"], lw=0.8, zorder=1)
             ax.set_xticks(list(C.P.KS), [f"{k:g}" for k in C.P.KS] if r == len(dss) - 1 else [])
@@ -94,7 +95,7 @@ def all_libraries():
         if vis:
             axs[vis[-1], c].set_xticks(list(C.P.KS), [f"{k:g}" for k in C.P.KS]); axs[vis[-1], c].set_xlabel("k", fontsize=6.5)
     hs = [Line2D([], [], marker="o", ls="-", lw=0.8, color=C.QP[p]["color"], ms=4, label=C.QP[p]["label"])
-          for p in players]
+          for p in impls]
     fig.tight_layout(rect=(0, 0.04, 1, 1), h_pad=0.6, w_pad=0.5)
     fig.legend(handles=hs, loc="lower center", ncol=len(hs), bbox_to_anchor=(0.5, 0.0), fontsize=6.5)
     C.save(fig, "quality_vs_k")
