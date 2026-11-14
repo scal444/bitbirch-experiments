@@ -1,0 +1,18 @@
+{
+ "n": 12156333129,
+ "buckets": 128,
+ "threshold": 0.26654936949797475,
+ "branching_factor": 1024,
+ "batch_size": 4096,
+ "seed": 0,
+ "readers": 4,
+ "lock": "sh",
+ "clusters": 2597507,
+ "insert_seconds": 4040.060487508774,
+ "finalize_seconds": 26.43359398841858,
+ "wall_seconds": 5630.880352020264,
+ "gpu_pool_high_gib": 39.67213068064302,
+ "summary_cache_gb": 0,
+ "fp_cache_gb": 0,
+ "host_maxrss_gib": 159.88734817504883
+}

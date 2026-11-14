@@ -1,0 +1,9 @@
+config/paths.env
+__pycache__/
+*.pyc
+*.npy
+*.npz
+*.pkl
+*.parquet
+/data/
+/labels/

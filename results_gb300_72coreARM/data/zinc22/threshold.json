@@ -1,0 +1,8 @@
+{
+ "n": 12156333129,
+ "isim": 0.12089515171581267,
+ "sigma_n50": 0.041615490794903454,
+ "k": 3.5,
+ "threshold": 0.26654936949797475,
+ "note": "iSIM by exact integer arithmetic (buckets.py fixed); bblean jt_isim_from_sum overflowed uint64 at this N and gave 0.2024. sigma unchanged."
+}

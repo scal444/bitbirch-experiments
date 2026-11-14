@@ -1,0 +1,8 @@
+dataset,k,seed,clusters_bblean_batched,clusters_nvmolkit,same_partition
+chembl34,3.5,3,158794,158794,True
+chembl34,3.5,4,165389,165389,True
+chembl34,3.5,5,154183,154183,True
+chembl34,3.5,6,172570,172570,True
+chembl34,3.5,7,165804,165804,True
+chembl34,3.5,8,156180,156180,True
+chembl34,3.5,9,161826,161826,True

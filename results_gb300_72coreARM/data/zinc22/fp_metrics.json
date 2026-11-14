@@ -1,0 +1,19 @@
+{
+ "n_molecules": 12156333129,
+ "clusters": 2597507,
+ "singletons": 167209,
+ "largest_cluster": 2786589,
+ "nonsingleton_clusters": 2430298,
+ "isim": 0.360555029130095,
+ "library_isim": 0.12089515171581267,
+ "library_isim_threshold_json": 0.12089515171581267,
+ "library_isim_float64_formula": 0.12089515171581264,
+ "medoid_isim_all": 0.11803378839551365,
+ "medoid_isim_nonsingleton": 0.11907590978737187,
+ "N": 12156333129,
+ "C": 2597507,
+ "pass1_s": 1293.4569783210754,
+ "misaligned_rows": 0,
+ "pass2_s": 980.9929196834564,
+ "gpu_peak_gib": 69.79927015304565
+}

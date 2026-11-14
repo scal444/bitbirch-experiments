@@ -1,0 +1,26 @@
+{
+ "download_seconds": {
+  "value": 5221,
+  "log": "download_z22.log",
+  "pattern": "done in (\\d+)s",
+  "line": "2026-10-09T20:52:37Z done in 5221s, 155220335858 bytes, failed: 0"
+ },
+ "download_bytes": {
+  "value": 155220335858,
+  "log": "download_z22.log",
+  "pattern": "done in \\d+s, (\\d+) bytes",
+  "line": "2026-10-09T20:52:37Z done in 5221s, 155220335858 bytes, failed: 0"
+ },
+ "fingerprint_mol_per_s": {
+  "value": 602980,
+  "log": "z22_ingest.log",
+  "pattern": "([\\d,]+) mol/s\\n",
+  "line": "1124 files this run (0 left), 10,696,391,492 mols, 17739s, 602,980 mol/s"
+ },
+ "route_seconds": {
+  "value": 12536,
+  "log": "z22_route.log",
+  "pattern": "this run, (\\d+)s",
+  "line": "routed shard 1133: 171 rows; 12,156,333,129 this run, 12536s"
+ }
+}

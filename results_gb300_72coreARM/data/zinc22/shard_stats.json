@@ -1,0 +1,6 @@
+{
+ "files": 1134,
+ "failed_smiles": 71,
+ "max_column_sum": 10931095499,
+ "max_column_sum_squared_over_2_64": 6.477503473285268
+}
