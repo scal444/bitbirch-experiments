@@ -18,8 +18,7 @@ from matplotlib.lines import Line2D  # noqa: E402
 import common as C  # noqa: E402
 from quality import MAIN_DS, PANELS  # noqa: E402
 
-PLAYER = {"serial": "serial", "batched": "batched", "parallel": "multiround", "multiround": "multiround"}
-PLAYERS = ["serial", "batched", "multiround"]
+IMPLS = ["bblean_serial", "bblean_batched", "bblean_split_merge"]
 PROC, ITER = "rc0", 10
 DX = 0.17  # before at j - DX, after at j + DX
 
@@ -30,25 +29,24 @@ def main():
     if not f.exists():
         C.waiting("refinement_chembl34", f"no {f}"); return
     d = pd.read_csv(f)
-    d["player"] = d.player.map(PLAYER)
     d = d[(d.k == 3.5) & (d.proc == PROC) & d.it.isin([0, ITER])]
     # the batched clusterings here were made and refined with bblean batched (multithreaded CPU)
-    style = {"serial": (C.BB_SER, "bblean serial"), "batched": (C.OURS, C.OURS_NAME),
-             "multiround": (C.BB_PAR, C.PAR_NAME)}
+    style = {"bblean_serial": (C.BB_SER, "bblean serial"), "bblean_batched": (C.OURS, C.OURS_NAME),
+             "bblean_split_merge": (C.BB_PAR, C.PAR_NAME)}
     fig, axs = plt.subplots(2, 4, figsize=(C.FULLW, 3.4))
     for ax, (col, title, sc) in zip(axs.flat, PANELS):
-        for j, p in enumerate(PLAYERS):
+        for j, p in enumerate(IMPLS):
             colr = style[p][0]
-            ms = [C.mean_point(ax, j + dx, d[(d.player == p) & (d.it == it)][col] * sc, colr, hollow=hollow)
+            ms = [C.mean_point(ax, j + dx, d[(d.implementation == p) & (d.it == it)][col] * sc, colr, hollow=hollow)
                   for it, dx, hollow in ((0, -DX, True), (ITER, DX, False))]
             if all(np.isfinite(ms)):
                 ax.annotate("", (j + DX, ms[1]), (j - DX, ms[0]),
                             arrowprops=dict(arrowstyle="-|>", color=colr, lw=0.8, mutation_scale=7,
                                             shrinkA=4, shrinkB=4), zorder=2)
-        ax.set_xticks([]); ax.set_xlim(-0.6, len(PLAYERS) - 0.4)
+        ax.set_xticks([]); ax.set_xlim(-0.6, len(IMPLS) - 0.4)
         ax.grid(axis="x", visible=False)
         ax.set_title(title, fontsize=7)
-    hs = [Line2D([], [], marker="o", ls="none", color=style[p][0], ms=5, label=style[p][1]) for p in PLAYERS]
+    hs = [Line2D([], [], marker="o", ls="none", color=style[p][0], ms=5, label=style[p][1]) for p in IMPLS]
     hs += [Line2D([], [], marker="o", ls="none", color="0.35", mfc="white", mew=1.2, ms=5, label="before refinement"),
            Line2D([], [], marker="o", ls="none", color="0.35", ms=5, label=f"after {ITER} recluster passes")]
     axs.flat[-1].axis("off")

@@ -1,15 +1,16 @@
 """Quality labels from bblean split-merge (bb multiround), bblean's own parallel mode for large libraries.
 
   python scripts/run/run_bblean_multiround.py DS [K ...] [--seeds ...] [--files 36] [--ps 36]
-         [--bblean tree|upstream] [--bf 1024]
+         [--bblean tree|upstream]
 
 The shuffled input (same input order as every implementation) is cut into --files equal .npy parts in a scratch
 dir under BB_OUT/tmp, then run as
-  bb multiround <dir> --ps P -b BF -t T     (bblean defaults for everything else:
+  bb multiround <dir> --ps P -b 1024 -t T   (bblean defaults for everything else:
   round 1 'diameter' per file, then 'full' refinement of each file's largest cluster,
   1 midsection round + final round with 'tolerance-diameter', tolerance 0.05, bin size 10)
 --bblean tree (default) uses the build at BB_BBLEAN_TREE; upstream uses the bblean release installed in the
-environment. Both give the same clusters. The label folder is `bblean_mr<P>`.
+environment. Both give the same clusters (the upstream run is only a check: its label folder is
+`bblean_mr<P>_upstream`, which the metrics skip).
 Writes BB_OUT/labels/DS/bblean_mr<P>/kK/sSEED.npy (+ .json). Time = wall time of the bb command (process start-up
 and file I/O included), plus bblean's own per-round timings.
 """
@@ -25,6 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.common import paths as P  # noqa: E402
+from scripts.common.implementations import label_folder  # noqa: E402
 import numpy as np  # noqa: E402
 
 ap = argparse.ArgumentParser()
@@ -33,13 +35,11 @@ ap.add_argument("ks", nargs="*", type=float, default=list(P.KS))
 ap.add_argument("--seeds", nargs="*", type=int)
 ap.add_argument("--files", type=int, default=36)
 ap.add_argument("--ps", type=int, default=36)
-ap.add_argument("--bf", type=int, default=P.BF)
 ap.add_argument("--bblean", choices=["tree", "upstream"], default="tree")
-ap.add_argument("--method")
 ap.add_argument("--force", action="store_true")
 a = ap.parse_args()
 
-method = a.method or f"bblean_mr{a.ps}" + ("" if a.bblean == "tree" else "_upstream")
+method = label_folder("bblean_split_merge", a.ps) + ("" if a.bblean == "tree" else "_upstream")
 d = P.DATASETS[a.ds]
 fps = np.load(d["fps"], mmap_mode="r")
 n = len(fps)
@@ -64,7 +64,7 @@ for k in a.ks:
         del x
         cmd = [sys.executable, "-c", "import sys; from bblean.cli import app; sys.argv[0]='bb'; app()",
                "multiround", str(work / "in"), "-o", str(work / "out"), "--ps", str(a.ps),
-               "-b", str(a.bf), "-t", repr(t)]
+               "-b", str(P.BF), "-t", repr(t)]
         st = time.perf_counter()
         subprocess.run(cmd, env=env, check=True, stdout=subprocess.DEVNULL)
         wall = time.perf_counter() - st
@@ -73,7 +73,7 @@ for k in a.ks:
         for i, ids in enumerate(clusters):
             lab[perm[np.asarray(ids)]] = i      # ids index the shuffled, concatenated input
         assert (lab >= 0).all()
-        info = dict(threshold=t, bf=a.bf, files=a.files, ps=a.ps, bblean=a.bblean, seconds=wall,
+        info = dict(threshold=t, bf=P.BF, files=a.files, ps=a.ps, bblean=a.bblean, seconds=wall,
                     rounds=json.loads((work / "out" / "timings.json").read_text()),
                     max_rss=json.loads((work / "out" / "max-rss.json").read_text()),
                     clusters=int(lab.max() + 1), cmd=" ".join(cmd[3:]))

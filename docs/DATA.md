@@ -204,8 +204,8 @@ Input order: each row goes to bucket `numpy.random.default_rng([0, file_index]).
 order 0–127, and each bucket is shuffled with `default_rng([0, 1000003, bucket]).permutation` (`read_bucket` in
 `zinc22_buckets.py`). Uniformly random, but not `default_rng(0).permutation(N)`.
 
-The ZINC22 clustering run itself isn't part of the quality and timing pipelines. The figures only read its small
-summaries in `results_gb300_72coreARM/data/zinc22/`, made by
+The ZINC22 clustering run itself was done outside these scripts; the repo has the data prep above and the export of
+its tables. The figures only read the small summaries in `data/zinc22/` of a results folder, made by
 `python scripts/data/zinc22_export.py $DATA/zinc22_2d_fp METRICS_DIR`.
 
 ## MoleculeACE (30 sets)

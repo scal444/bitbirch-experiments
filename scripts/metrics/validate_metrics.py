@@ -1,8 +1,9 @@
 """Check metrics.py against plain CPU / bblean / sklearn references on one labelling of a small set.
 
-   python scripts/metrics/validate_metrics.py [DS] [METHOD] [K] [SEED]   (default: np bblean_tree 3.5 0)
+   python scripts/metrics/validate_metrics.py [DS] [IMPLEMENTATION] [K] [SEED]   (default: np bblean_serial 3.5 0)
 
-METHOD is a label folder under BB_OUT/labels (e.g. `bblean_tree`, `nvmolkit_main_bf254`).
+IMPLEMENTATION: bblean_serial, bblean_split_merge (36 processes), bblean_batched or nvmolkit_batched; its labels
+under BB_OUT/labels are used.
 """
 import sys
 import warnings
@@ -15,14 +16,15 @@ from sklearn import metrics as skm
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
 import metrics as M  # noqa: E402
 from metrics import P  # noqa: E402
+from scripts.common.implementations import label_folder  # noqa: E402
 
 warnings.filterwarnings("ignore")
-ds, method = (sys.argv[1:3] + ["np", "bblean_tree"][len(sys.argv[1:3]):])[:2]
+ds, impl = (sys.argv[1:3] + ["np", "bblean_serial"][len(sys.argv[1:3]):])[:2]
 k = float(sys.argv[3]) if len(sys.argv) > 3 else 3.5
 seed = int(sys.argv[4]) if len(sys.argv) > 4 else 0
 ctx = M.load_context(ds)
 fps = np.load(P.DATASETS[ds]["fps"])
-lab, info = M.load_labels(P.label_path(ds, method, k, seed))
+lab, info = M.load_labels(P.label_path(ds, label_folder(impl), k, seed))
 row, trows = M.evaluate(ctx, lab, info)
 codes, sizes = M.codes_of(lab)
 C = len(sizes)
@@ -130,6 +132,6 @@ for tr in trows:
         m2 = mem & (tgt >= 0)
         ext_ref("top-k tgt", {f"top-k tgt_{x}": tr[f"tgt_{x}"] for x in M.EXT}, codes[m2], tgt[m2])
 
-print(f"{ds} {method} k{k:g} s{seed}: {C} clusters; max abs error per metric:")
+print(f"{ds} {impl} k{k:g} s{seed}: {C} clusters; max abs error per metric:")
 for k_, v in err.items():
     print(f"  {k_:45s} {v:.2e}")

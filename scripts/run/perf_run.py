@@ -1,19 +1,21 @@
 """One timed run (time and peak memory against N); appends one row to data/timing/timings.csv of the results folder.
 
-  python scripts/run/perf_run.py nvmolkit   SET [--repeats 2]              nvMolKit batched (GPU, device-resident input)
-  python scripts/run/perf_run.py serial     SET [--repeats 1]              bblean serial, one thread
-  python scripts/run/perf_run.py batched    SET --threads T [--repeats 2]  bblean batched (multithreaded CPU), T threads
-  python scripts/run/perf_run.py multiround SET --ps P [--repeats 1]       bblean split-merge (bb multiround), P processes
+  python scripts/run/perf_run.py nvmolkit_batched   SET [--repeats 2]              GPU, device-resident input
+  python scripts/run/perf_run.py bblean_serial      SET [--repeats 1]              one thread
+  python scripts/run/perf_run.py bblean_batched     SET --threads T [--repeats 2]  multithreaded CPU, T threads
+  python scripts/run/perf_run.py bblean_split_merge SET --ps P [--repeats 1]       bb multiround, P processes
 
-Builds: serial and multiround from BB_BBLEAN_TREE, batched from BB_BBLEAN_BATCHED, nvmolkit from BB_NVMOLKIT_PY.
-All at k = 3.5, bf 1024 (or --bf), batch 4096, input in the seed-0 order (run scripts/run/perf_inputs.py first).
-Time: wall time of the clustering call only (fit / bitbirch), best of --repeats; multiround: wall time of the whole
+Builds: bblean_serial and bblean_split_merge from BB_BBLEAN_TREE, bblean_batched from BB_BBLEAN_BATCHED,
+nvmolkit_batched from BB_NVMOLKIT_PY. All at k = 3.5, bf 1024 (or --bf), batch 4096, input in the seed-0 order (run
+scripts/run/perf_inputs.py first).
+Time: wall time of the clustering call only (fit / bitbirch), best of --repeats; split-merge: wall time of the whole
 `bb multiround` command on the pre-split input dir (process start, file reads and all three rounds).
 Memory:
-  host_peak_gib  serial / batched / nvmolkit: peak RSS of this process (getrusage), which includes the input copy
-                 (input_gib); multiround: bblean's own monitor, sum of RSS over all its processes, sampled every 1 s.
-  gpu_pool_peak_gib  nvmolkit: CUDA default memory pool UsedMemHigh during the call (nvMolKit allocates there with
-                 cudaMallocAsync); the device input (gpu_input_gib, torch allocator) is extra.
+  host_peak_gib  bblean_serial / bblean_batched / nvmolkit_batched: peak RSS of this process (getrusage), which
+                 includes the input copy (input_gib); bblean_split_merge: bblean's own monitor, sum of RSS over all its
+                 processes, sampled every 1 s.
+  gpu_pool_peak_gib  nvmolkit_batched: CUDA default memory pool UsedMemHigh during the call (nvMolKit allocates there
+                 with cudaMallocAsync); the device input (gpu_input_gib, torch allocator) is extra.
 Run it on an otherwise idle machine.
 """
 import argparse
@@ -35,7 +37,7 @@ from scripts.common import paths as P  # noqa: E402
 from scripts.run import perf  # noqa: E402
 
 ap = argparse.ArgumentParser()
-ap.add_argument("player", choices=["nvmolkit", "serial", "batched", "multiround"])
+ap.add_argument("implementation", choices=["nvmolkit_batched", "bblean_serial", "bblean_batched", "bblean_split_merge"])
 ap.add_argument("set", choices=list(perf.SETS_N))
 ap.add_argument("--threads", type=int, default=36)
 ap.add_argument("--ps", type=int, default=36)
@@ -53,18 +55,19 @@ n = perf.SETS_N[s]
 base = perf.base_of(s)
 _t = P.thresholds()[base]
 t = _t["isim"] + a.k * _t["sigma_n50"]
-row = dict(player=a.player, set=s, n=n, k=a.k, threshold=round(t, 6), bf=a.bf, batch_size="", threads="", processes="",
+row = dict(implementation=a.implementation, set=s, n=n, k=a.k, threshold=round(t, 6), bf=a.bf, batch_size="",
+           threads="", processes="",
            repeats=a.repeats, seconds_min="", seconds_all="", clusters="", host_peak_gib="", input_gib=round(n * 256 / 2**30, 3),
            gpu_pool_peak_gib="", gpu_input_gib="", build="", commit="", tag=a.tag)
 secs = []
 
-if a.player in ("serial", "batched"):
-    root = P.path("BB_BBLEAN_TREE" if a.player == "serial" else "BB_BBLEAN_BATCHED")
+if a.implementation in ("bblean_serial", "bblean_batched"):
+    root = P.path("BB_BBLEAN_TREE" if a.implementation == "bblean_serial" else "BB_BBLEAN_BATCHED")
     sys.path.insert(0, str(root))
     import bblean
     assert Path(bblean.__file__).parent.parent == root, bblean.__file__
     x = perf.load(s)
-    kw = dict(batch_size=a.batch_size, n_threads=a.threads) if a.player == "batched" else {}
+    kw = dict(batch_size=a.batch_size, n_threads=a.threads) if a.implementation == "bblean_batched" else {}
     for _ in range(a.repeats):
         tree = None
         tree = bblean.BitBirch(threshold=t, branching_factor=a.bf, merge_criterion="diameter", **kw)
@@ -74,12 +77,12 @@ if a.player in ("serial", "batched"):
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20  # before building the python cluster lists
     row.update(build=str(root), commit=perf.git_commit(root), host_peak_gib=round(peak, 3),
                clusters=len(tree.get_cluster_mol_ids()))
-    if a.player == "batched":
+    if a.implementation == "bblean_batched":
         row.update(batch_size=a.batch_size, threads=a.threads)
     else:
         row.update(threads=1)
 
-elif a.player == "multiround":
+elif a.implementation == "bblean_split_merge":
     root = P.path("BB_BBLEAN_TREE")
     d = perf.parts_dir(s, a.ps)
     assert d.exists(), f"run perf_inputs.py {s} --parts {a.ps} first"
@@ -100,7 +103,7 @@ elif a.player == "multiround":
                tag=(a.tag + " " if a.tag else "") + "rounds=" + perf.dumps({k: round(v, 2) for k, v in rounds.items()}))
     shutil.rmtree(out, ignore_errors=True)
 
-else:  # nvmolkit
+else:  # nvmolkit_batched
     import numpy as np
     root = P.path("BB_NVMOLKIT_PY")
     sys.path.insert(0, str(root))

@@ -2,9 +2,10 @@
 
    python scripts/metrics/metrics.py [DS ...] [--force]     (output data/quality/by_run/ of the results folder)
 
-For every labels/<ds>/<method>/k<k>/s<seed>.npy that has its .json, writes one row to metrics/<ds>.csv and one
-row per k_top to metrics/topk_<ds>.csv: clusters, singletons, within-cluster iSIM, scaffold purity, medoid iSIM,
-and ARI / AMI / V-measure against Murcko scaffolds and ChEMBL targets (BB_ACTIVES; chembl34 and c35). A labelling
+For every label file of the four implementations under BB_OUT/labels/<ds>/ that has its .json, writes one row to
+by_run/<ds>.csv and one row per k_top to by_run/topk_<ds>.csv (rows identified by implementation, processes for
+bblean split-merge, bf, k and input order `seed`): clusters, singletons, within-cluster iSIM, scaffold purity, medoid
+iSIM, and ARI / AMI / V-measure against Murcko scaffolds and ChEMBL targets (BB_ACTIVES; chembl34 and c35). A labelling
 that already has its row is skipped; --force recomputes every row.
 
 GPU (torch) work: per-cluster bit sums, iSIM, medoids, external metrics. Scaffold / target majority counts run in CPU
@@ -27,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ext_metrics import external_metrics  # noqa: E402
 
 from scripts.common import paths as P  # noqa: E402
+from scripts.common.implementations import from_folder  # noqa: E402
 
 KTOPS = (5, 20, 100, 1000)
 ACTIVES = P.path("BB_ACTIVES")
@@ -269,13 +271,13 @@ def evaluate(ctx, lab, info):
 # ---------------------------------------------------------------- driver
 
 def find_labels(ds):
+    """Label files of the four implementations (other folders under BB_OUT/labels/<ds> are skipped)."""
     out = []
     for p in sorted((P.OUT / "labels" / ds).glob("*/k*/s*.npy")):
-        if p.name.endswith(".partial.npy"):
+        impl = from_folder(p.parent.parent.name)
+        if p.name.endswith(".partial.npy") or impl is None:
             continue
-        mdir = p.parent.parent.name
-        method, bf = (mdir.rsplit("_bf", 1)[0], int(mdir.rsplit("_bf", 1)[1])) if "_bf" in mdir else (mdir, P.BF)
-        out.append(dict(path=p, method=mdir, base_method=method, bf=bf, k=float(p.parent.name[1:]),
+        out.append(dict(path=p, implementation=impl[0], processes=impl[1], bf=P.BF, k=float(p.parent.name[1:]),
                         seed=int(p.stem[1:])))
     return out
 
@@ -286,19 +288,24 @@ def write_csv(df, path):
     os.replace(tmp, path)
 
 
-KEY = ["dataset", "method", "k", "seed"]
+KEY = ["dataset", "implementation", "processes", "k", "seed"]
+
+
+def run_key(implementation, processes, k, seed):
+    return implementation, None if pd.isna(processes) else int(processes), float(k), int(seed)
 
 
 def run_dataset(ds, force=False):
     OUT.mkdir(parents=True, exist_ok=True)
     main_p, top_p = OUT / f"{ds}.csv", OUT / f"topk_{ds}.csv"
-    main = pd.read_csv(main_p) if main_p.exists() and not force else pd.DataFrame()
-    top = pd.read_csv(top_p) if top_p.exists() and not force else pd.DataFrame()
-    done = {(r.method, float(r.k), int(r.seed)) for r in main.itertuples()} if len(main) else set()
+    read = lambda f: pd.read_csv(f, dtype={"processes": "Int64"})  # noqa: E731
+    main = read(main_p) if main_p.exists() and not force else pd.DataFrame()
+    top = read(top_p) if top_p.exists() and not force else pd.DataFrame()
+    done = {run_key(r.implementation, r.processes, r.k, r.seed) for r in main.itertuples()} if len(main) else set()
 
     ctx = None
     for item in find_labels(ds):
-        key = (item["method"], item["k"], item["seed"])
+        key = run_key(item["implementation"], item["processes"], item["k"], item["seed"])
         if key in done:
             continue
         lab, info = load_labels(item["path"])
@@ -310,19 +317,21 @@ def run_dataset(ds, force=False):
             print(f"{ds} {key}: {len(lab)} labels != {ctx['n']} molecules, skipped", flush=True)
             continue
         row, trows = evaluate(ctx, lab, info)
-        ident = dict(dataset=ds, method=item["method"], base_method=item["base_method"], bf=item["bf"], k=item["k"],
-                     seed=item["seed"])
+        ident = dict(dataset=ds, implementation=item["implementation"], processes=item["processes"], bf=item["bf"],
+                     k=item["k"], seed=item["seed"])
         row = {**ident, **row}
         trows = [{**ident, **t} for t in trows]
-        sel = lambda df: (df["method"] == item["method"]) & (df["k"] == item["k"]) & (df["seed"] == item["seed"])  # noqa
+        sel = lambda df: pd.Series([run_key(*r) == key for r in  # noqa: E731
+                                    zip(df.implementation, df.processes, df.k, df.seed)], index=df.index, dtype=bool)
         if len(main):
             main = main[~sel(main)]
         if len(top):
             top = top[~sel(top)]
-        main = pd.concat([main, pd.DataFrame([row])], ignore_index=True).sort_values(KEY, ignore_index=True)
-        top = pd.concat([top, pd.DataFrame(trows)], ignore_index=True).sort_values(KEY + ["k_top"], ignore_index=True)
+        new = lambda rows: pd.DataFrame(rows).astype({"processes": "Int64"})  # noqa: E731
+        main = pd.concat([main, new([row])], ignore_index=True).sort_values(KEY, ignore_index=True)
+        top = pd.concat([top, new(trows)], ignore_index=True).sort_values(KEY + ["k_top"], ignore_index=True)
         write_csv(main, main_p); write_csv(top, top_p)
-        print(f"{ds} {item['method']} k{item['k']:g} s{item['seed']}: {row['metrics_seconds']:.1f}s "
+        print(f"{ds} {item['implementation']} k{item['k']:g} s{item['seed']}: {row['metrics_seconds']:.1f}s "
               f"(gpu {row['gpu_seconds']:.1f}, ext {row['external_seconds']:.1f}) clusters {row['clusters']} "
               f"isim {row['isim']:.4f} purity {row['scaffold_purity']:.4f} medoid {row['medoid_isim_nonsingleton']:.4f} "
               f"ami_scaf {row['scaf_ami']:.4f}", flush=True)

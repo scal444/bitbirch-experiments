@@ -1,16 +1,19 @@
 # scripts/
 
 Paths come from `config/paths.env` (read by `common/paths.py`). Tables go to `results_<BB_RESULTS_NAME>/data/`,
-figures to its `plots/`. Run everything in the `bitbirch` conda environment from `setup/`.
+figures to its `plots/`. Run everything in the `bitbirch` conda environment from `setup/`, with the builds from
+`setup/fetch_and_build.sh` (bblean at pinned commits, upstream nvMolKit main).
 
-Names the four implementations go by in code and tables:
+The four implementations have one name each, used in every table, figure script and command line
+(`common/implementations.py`). Split-merge's process count P is a separate `processes` column. The label folders
+under `BB_OUT/labels/<library>/` keep shorter internal names:
 
-| implementation | key | label folder |
+| implementation | name | label folder |
 |---|---|---|
-| bblean serial | `serial` | `bblean_tree` |
-| bblean split-merge | `multiround` (`parallel` in `refinement/`) | `bblean_mr36` |
-| bblean batched | `bblean_batched` / `batched` (in `refinement/` and timing) / `cpu_batched` (timing figures) | `bblean_batched` |
-| nvMolKit batched | `batched` (quality) / `gpu` / `nvmolkit` (timing) | `nvmolkit_main` |
+| bblean serial | `bblean_serial` | `bblean_tree` |
+| bblean split-merge | `bblean_split_merge` | `bblean_mr<P>` |
+| bblean batched | `bblean_batched` | `bblean_batched` |
+| nvMolKit batched | `nvmolkit_batched` | `nvmolkit_main` |
 
 ## Running
 
@@ -36,21 +39,23 @@ machine. Rows are appended to
 Single runs, e.g. ChEMBL34 at k = 3.5, input order 0:
 
 ```
-python scripts/run/run_bblean.py serial chembl34 3.5 --seeds 0
-python scripts/run/run_bblean.py batched chembl34 3.5 --seeds 0 --threads 36
+python scripts/run/run_bblean.py bblean_serial chembl34 3.5 --seeds 0
+python scripts/run/run_bblean.py bblean_batched chembl34 3.5 --seeds 0 --threads 36
 python scripts/run/run_nvmolkit.py chembl34 3.5 --seeds 0
 python scripts/run/run_bblean_multiround.py chembl34 3.5 --seeds 0 --files 36 --ps 36
 python scripts/metrics/metrics.py chembl34    # skips labellings that already have a row; --force redoes them
+python scripts/run/perf_run.py nvmolkit_batched chembl34 --repeats 2   # one timed run (after perf_inputs.py)
 ```
 
 ## What's where
 
 - `common/`: `paths.py` (config, results folder, libraries, thresholds, input orders, label layout),
-  `partitions.py` (compare two labellings).
+  `implementations.py` (the four names and their label folders), `partitions.py` (compare two labellings).
 - `data/`: fingerprint and scaffold prep (`docs/DATA.md`); `zinc22_export.py` copies the small ZINC22 run summaries
   into `data/zinc22/`.
 - `run/`: the two drivers above; `run_bblean.py`, `run_bblean_multiround.py`, `run_nvmolkit.py` (labels);
-  `run_moleculeace.py`; `check_batched_vs_nvmolkit.py`; timing helpers `perf.py` (timing sets), `perf_inputs.py`,
+  `run_moleculeace.py`; `check_batched_vs_nvmolkit.py` (bblean batched and nvMolKit batched must give the same
+  clusters); timing helpers `perf.py` (timing sets), `perf_inputs.py`,
   `perf_run.py` (one timed run), `perf_finalize.py`.
 - `metrics/`: `thresholds.py`; `metrics.py` (quality against chemistry, the main quality measure, GPU);
   `agreement.py` (agreement between runs, GPU); `ext_metrics.py` (torch ARI/AMI, matches scikit-learn);

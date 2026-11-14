@@ -22,14 +22,14 @@ from matplotlib.lines import Line2D  # noqa: E402
 import common as C  # noqa: E402
 
 CSV = C.P.QUALITY / "agreement.csv"
-# (impl_a, impl_b): same implementation first (floor first), then against bblean serial
-COMPS = [("serial", "serial"), ("multiround", "multiround"), ("bblean_batched", "bblean_batched"),
-         ("batched", "batched"), ("serial", "multiround"), ("serial", "bblean_batched"), ("serial", "batched")]
+# (implementation_a, implementation_b): same implementation first (floor first), then against bblean serial
+SER, SM, BB, NV = "bblean_serial", "bblean_split_merge", "bblean_batched", "nvmolkit_batched"
+COMPS = [(SER, SER), (SM, SM), (BB, BB), (NV, NV), (SER, SM), (SER, BB), (SER, NV)]
 SUBSETS = [("all", "all molecules"), ("top20", "20 largest clusters"), ("top50", "50 largest clusters")]
 SCORES = [("ami", "AMI"), ("ari", "ARI")]
 XPOS = [0, 1, 2, 3, 4.7, 5.7, 6.7]  # a gap between the two groups (same implementation | against bblean serial)
 K = 3.5
-FLOOR = ("serial", "serial")
+FLOOR = (SER, SER)
 
 
 def style(c):
@@ -48,7 +48,8 @@ def label(c):
 
 
 def values(d, ds, k, c, subset, score):
-    s = d[(d.dataset == ds) & (d.k == k) & (d.impl_a == c[0]) & (d.impl_b == c[1]) & (d.subset == subset)]
+    s = d[(d.dataset == ds) & (d.k == k) & (d.implementation_a == c[0]) & (d.implementation_b == c[1])
+          & (d.subset == subset)]
     return s[score].to_numpy()
 
 
@@ -69,7 +70,7 @@ def comparisons_panel(ax, d, ds, subset, score, ms=4.5):
         if len(v):
             m = point(ax, x, v, c, ms=ms)
             if c == FLOOR:
-                ax.axhline(m, color=C.QP["serial"]["color"], ls="--", lw=0.8, zorder=1)
+                ax.axhline(m, color=C.QP[SER]["color"], ls="--", lw=0.8, zorder=1)
             shown.append(c)
     ax.set_xlim(-0.6, XPOS[-1] + 0.6)
     ax.set_xticks([])
@@ -98,7 +99,7 @@ def fig_chembl34(d):
                 ax.set_title(sub_name, fontsize=7.5)
             if c_ == 0:
                 ax.set_ylabel(sname)
-    n = d[(d.dataset == ds) & (d.k == K) & (d.impl_a == "serial") & (d.impl_b == "serial")]
+    n = d[(d.dataset == ds) & (d.k == K) & (d.implementation_a == SER) & (d.implementation_b == SER)]
     n_orders = len(set(n.order_a) | set(n.order_b))
     fig.suptitle(f"Agreement between runs on different input orders, ChEMBL34, k = 3.5 ({n_orders} orders)",
                  x=0.01, ha="left", fontsize=8.5, fontweight="bold")

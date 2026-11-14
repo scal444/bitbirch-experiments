@@ -25,20 +25,20 @@ def main():
     top, bins = pd.read_csv(DATA / "top_clusters.csv"), pd.read_csv(DATA / "size_bins.csv")
     from matplotlib.patches import Patch
     for (ds, k), t in top.groupby(["dataset", "k"]):
-        players = C.players_present(t)
-        n = len(players)
+        impls = C.implementations_present(t)
+        n = len(impls)
         fig = plt.figure(figsize=(C.FULLW, 3.9))
         gs = fig.add_gridspec(2, n, height_ratios=[1, 0.8], hspace=0.8, wspace=0.3)
         ymax = t["size"].max() * 1.05
         axs = []
-        for i, p in enumerate(players):
+        for i, p in enumerate(impls):
             ax = fig.add_subplot(gs[0, i], sharey=axs[0] if axs else None)
             axs.append(ax)
-            s = t[t.player == p].sort_values("rank")
+            s = t[t.implementation == p].sort_values("rank")
             ax.bar(s["rank"], s["size"], width=0.8, color=C.QP[p]["color"], alpha=0.35)
             ax.bar(s["rank"], s["unique_scaffolds"], width=0.5, color=C.QP[p]["color"])
             ax.set_title(C.panel_label(p), fontsize=6.5,
-                         color=C.QP[p]["color"] if p != "multiround" else C.BB_SER_REF)
+                         color=C.QP[p]["color"] if p != "bblean_split_merge" else C.BB_SER_REF)
             ax.set_xlabel("cluster rank")
             ax.set_ylim(0, ymax)
             ax.set_xticks([1, 5, 10, 15, 20])
@@ -50,8 +50,8 @@ def main():
         ax = fig.add_subplot(gs[1, :])
         b = bins[(bins.dataset == ds) & (bins.k == k)]
         w = 0.8 / max(n, 1)
-        for i, p in enumerate(players):
-            r = b[b.player == p]
+        for i, p in enumerate(impls):
+            r = b[b.implementation == p]
             if len(r):
                 vals = [r[f"gt{x}"].iloc[0] for x in BINS]
                 ax.bar(np.arange(len(BINS)) + (i - (n - 1) / 2) * w, vals, width=w * 0.9,

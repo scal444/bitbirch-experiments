@@ -2,8 +2,9 @@
 
 Paths come from the repo config (scripts/common/paths.py): labels and work files under BB_REFINE_POST_LABELS
 (outside git), tables in data/refinement/ of the results folder, working figures under BB_REFINE_POST_LABELS/figures.
-Implementation keys: serial = bblean serial, parallel = bblean split-merge (bb multiround, P = 36),
-batched = bblean batched (multithreaded CPU; same partitions as nvMolKit batched).
+Implementations: bblean_serial, bblean_split_merge (bb multiround, P = 36), bblean_batched (multithreaded CPU; same
+partitions as nvMolKit batched). Their label folders under BB_REFINE_POST_LABELS/labels/<ds>/ are `serial`,
+`parallel` and `batched` (internal names, see FOLDER).
 """
 import json
 import sys
@@ -16,7 +17,8 @@ sys.path.insert(0, str(HERE.parents[1]))
 from scripts.common import paths as P  # noqa: E402
 
 BF = 1024
-PLAYERS = ("serial", "parallel", "batched")       # bblean serial, bblean split-merge (P = 36), bblean batched
+IMPLEMENTATIONS = ("bblean_serial", "bblean_split_merge", "bblean_batched")
+FOLDER = {"bblean_serial": "serial", "bblean_split_merge": "parallel", "bblean_batched": "batched"}  # label folders
 PROCS = {"rc0": 10, "rc1": 5, "ref": 5}           # procedure -> iterations run
 OUT_DIR = P.path("BB_REFINE_POST_LABELS")
 CSV_DIR = P.REFINEMENT
@@ -24,9 +26,9 @@ FIG_DIR = OUT_DIR / "figures"
 threshold, sigma, perm = P.threshold, P.sigma, P.perm
 
 
-def label_path(ds, player, proc, k, seed, it):
+def label_path(ds, impl, proc, k, seed, it):
     """proc 'none' with it 0 = the unrefined clustering."""
-    return OUT_DIR / "labels" / ds / player / proc / f"k{k:g}_s{seed}_it{it}.npy"
+    return OUT_DIR / "labels" / ds / FOLDER[impl] / proc / f"k{k:g}_s{seed}_it{it}.npy"
 
 
 def save_labels(path, lab, info):

@@ -18,7 +18,7 @@ import moleculeace as M  # noqa: E402
 
 C = M.C
 PANELS = [("clusters", "Clusters"), ("ch", "Calinski–Harabasz ↑"), ("db", "Davies–Bouldin ↓"), ("dunn", "Dunn ↑")]
-PLAYERS = ["serial", "bblean_batched", "batched", "multiround"]
+IMPLS = ["bblean_serial", "bblean_batched", "nvmolkit_batched", "bblean_split_merge"]
 
 
 def label(p):
@@ -31,16 +31,16 @@ def main(t=0.65):
     d = d[np.isclose(d.threshold.astype(float), t) & (d.min_size == 2)] if len(d) else d
     if d.empty:
         C.waiting("moleculeace_by_set", "MoleculeACE runs at threshold 0.65"); return
-    d = d.groupby(["set", "player"])[[c for c, _ in PANELS]].mean().reset_index()
+    d = d.groupby(["set", "implementation"])[[c for c, _ in PANELS]].mean().reset_index()
     fig, axs = plt.subplots(1, len(PANELS), figsize=(C.FULLW, 1.9))
     for ax, (col, title) in zip(axs, PANELS):
-        w = d[d.player.isin(PLAYERS)].pivot(index="set", columns="player", values=col)[PLAYERS].dropna()
-        for j, p in enumerate(PLAYERS):  # only sets where every implementation has a value, so the means compare
+        w = d[d.implementation.isin(IMPLS)].pivot(index="set", columns="implementation", values=col)[IMPLS].dropna()
+        for j, p in enumerate(IMPLS):  # only sets where every implementation has a value, so the means compare
             C.mean_point(ax, j, w[p], C.QP[p]["color"])
-        ax.set_xticks([]); ax.set_xlim(-0.6, len(PLAYERS) - 0.4)
+        ax.set_xticks([]); ax.set_xlim(-0.6, len(IMPLS) - 0.4)
         ax.grid(axis="x", visible=False)
         ax.set_title(title if len(w) == d["set"].nunique() else f"{title} ({len(w)} sets)", fontsize=7)
-    hs = [Line2D([], [], ls="none", marker="o", ms=5, color=C.QP[p]["color"], label=label(p)) for p in PLAYERS]
+    hs = [Line2D([], [], ls="none", marker="o", ms=5, color=C.QP[p]["color"], label=label(p)) for p in IMPLS]
     fig.tight_layout(rect=(0, 0.12, 1, 1), w_pad=0.8)
     fig.legend(handles=hs, loc="lower center", ncol=4, bbox_to_anchor=(0.5, 0.0), fontsize=6.5)
     C.save(fig, "moleculeace_by_set")

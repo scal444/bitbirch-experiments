@@ -21,12 +21,11 @@ The reference run is the first run of the pair (bblean serial for pairs across i
 implementation neither run comes first, so the value is the mean of the two choices (each run as reference once);
 n_molecules, clusters_a and clusters_b are then means as well. Ties in cluster size are broken by the lower cluster id.
 
-Writes data/quality/agreement.csv of the results folder (columns: dataset, k, impl_a, impl_b, order_a, order_b,
-subset, ami, ari, n_molecules, clusters_a, clusters_b). Pairs already in the table are kept; --force recomputes all.
-Implementation keys as in the quality tables, with the label folders under BB_OUT/labels: serial (`bblean_tree`),
-multiround (bblean split-merge, `bblean_mr36`), bblean_batched (`bblean_batched`), batched (nvMolKit batched,
-`nvmolkit_main`). AMI/ARI from ext_metrics (GPU, or multithreaded CPU torch;
-matches scikit-learn, see validate_metrics.py).
+Writes data/quality/agreement.csv of the results folder (columns: dataset, k, implementation_a, implementation_b,
+order_a, order_b, subset, ami, ari, n_molecules, clusters_a, clusters_b). Pairs already in the table are kept; --force
+recomputes all. Implementations: bblean_serial, bblean_split_merge (36 processes), bblean_batched, nvmolkit_batched
+(scripts/common/implementations.py). AMI/ARI from ext_metrics (GPU, or multithreaded CPU torch; matches
+scikit-learn, see validate_metrics.py).
 """
 import argparse
 import itertools
@@ -39,21 +38,19 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.common import paths as P  # noqa: E402
+from scripts.common.implementations import IMPLEMENTATIONS, label_folder  # noqa: E402
 from scripts.metrics.ext_metrics import external_metrics  # noqa: E402
 
-MAIN_P = 36  # process count of the bblean split-merge runs in the comparison
-IMPLS = {"serial": "bblean_tree", "multiround": f"bblean_mr{MAIN_P}", "bblean_batched": "bblean_batched",
-         "batched": "nvmolkit_main"}  # implementation -> label folder
-REF = "serial"
+REF = "bblean_serial"
 TOPS = (20, 50)
 OUTF = P.QUALITY / "agreement.csv"
-KEY = ["dataset", "k", "impl_a", "impl_b", "order_a", "order_b", "subset"]
+KEY = ["dataset", "k", "implementation_a", "implementation_b", "order_a", "order_b", "subset"]
 COLS = KEY + ["ami", "ari", "n_molecules", "clusters_a", "clusters_b"]
 
 
 def orders_with_labels(ds, impl, k):
     """Every input order that has labels for this implementation: {order: label file s<order>.npy}."""
-    d = P.label_path(ds, IMPLS[impl], k, 0).parent
+    d = P.label_path(ds, label_folder(impl), k, 0).parent
     found = {int(f.stem[1:]): f for f in d.glob("s*.npy") if f.stem[1:].isdigit()} if d.is_dir() else {}
     return dict(sorted(found.items()))
 
@@ -111,11 +108,11 @@ def main():
 
     for ds in a.datasets:
         for k in a.ks:
-            files = {impl: orders_with_labels(ds, impl, k) for impl in IMPLS}
+            files = {impl: orders_with_labels(ds, impl, k) for impl in IMPLEMENTATIONS}
             jobs = []
             for impl, fs in files.items():  # within: unordered pairs of different orders
                 jobs += [(impl, impl, sa, sb) for sa, sb in itertools.combinations(fs, 2)]
-            for impl in IMPLS:  # across: serial on order a against impl on order b, a != b
+            for impl in IMPLEMENTATIONS:  # across: serial on order a against impl on order b, a != b
                 if impl != REF:
                     jobs += [(REF, impl, sa, sb) for sa in files[REF] for sb in files[impl] if sa != sb]
             print(ds, f"k{k:g}", {i: list(f) for i, f in files.items()}, f"{len(jobs)} pairs", flush=True)
@@ -125,7 +122,8 @@ def main():
                     continue
                 res = pair_rows(load(files[ia][sa]), load(files[ib][sb]), symmetric=ia == ib)
                 for sub, m in res.items():
-                    rows.append(dict(dataset=ds, k=k, impl_a=ia, impl_b=ib, order_a=sa, order_b=sb, subset=sub, **m))
+                    rows.append(dict(dataset=ds, k=k, implementation_a=ia, implementation_b=ib, order_a=sa,
+                                     order_b=sb, subset=sub, **m))
                 done.add((ds, k, ia, ib, sa, sb))
                 new += 1
                 print(ds, f"k{k:g}", ia, ib, sa, sb,

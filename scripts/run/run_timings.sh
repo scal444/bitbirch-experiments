@@ -41,31 +41,31 @@ stage_inputs() {
 }
 
 stage_gpu() {
-  for s in $SIZES; do pr nvmolkit "$s" --repeats 2; done
+  for s in $SIZES; do pr nvmolkit_batched "$s" --repeats 2; done
 }
 
 stage_sweep() {
   for s in $SWEEP_SETS; do
-    for T in $WORKERS; do pr batched "$s" --threads "$T" --repeats 2 --tag sweep; done
-    for P in $WORKERS; do pr multiround "$s" --ps "$P" --repeats 2 --tag sweep; done
+    for T in $WORKERS; do pr bblean_batched "$s" --threads "$T" --repeats 2 --tag sweep; done
+    for P in $WORKERS; do pr bblean_split_merge "$s" --ps "$P" --repeats 2 --tag sweep; done
   done
 }
 
 stage_cpu() {
   for s in $CPU_SIZES; do
-    case " $SWEEP_SETS " in *" $s "*) ;; *) pr batched "$s" --threads "$THREADS" --repeats "$(reps "$s")";; esac
+    case " $SWEEP_SETS " in *" $s "*) ;; *) pr bblean_batched "$s" --threads "$THREADS" --repeats "$(reps "$s")";; esac
   done
-  for s in $CPU_SIZES; do pr multiround "$s" --ps "$P_MAIN" --repeats "$(reps "$s")"; done
-  for s in $CPU_SIZES; do pr serial "$s" --repeats "$(reps "$s")"; done
+  for s in $CPU_SIZES; do pr bblean_split_merge "$s" --ps "$P_MAIN" --repeats "$(reps "$s")"; done
+  for s in $CPU_SIZES; do pr bblean_serial "$s" --repeats "$(reps "$s")"; done
 }
 
 stage_big() {
-  pr batched zinc50m --threads "$THREADS" --repeats 1
-  pr multiround zinc50m --ps "$P_MAIN" --repeats 1
-  pr serial zinc50m --repeats 1
-  pr batched zinc101m --threads "$THREADS" --repeats 1
-  pr multiround zinc101m --ps "$P_MAIN" --repeats 1
-  pr serial zinc101m --repeats 1
+  pr bblean_batched zinc50m --threads "$THREADS" --repeats 1
+  pr bblean_split_merge zinc50m --ps "$P_MAIN" --repeats 1
+  pr bblean_serial zinc50m --repeats 1
+  pr bblean_batched zinc101m --threads "$THREADS" --repeats 1
+  pr bblean_split_merge zinc101m --ps "$P_MAIN" --repeats 1
+  pr bblean_serial zinc101m --repeats 1
 }
 
 stage_finalize() { python scripts/run/perf_finalize.py --write || FAILED+=("perf_finalize"); }

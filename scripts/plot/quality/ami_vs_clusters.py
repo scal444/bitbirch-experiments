@@ -20,16 +20,16 @@ def main():
     if not C.any_metrics(topk=False):
         C.waiting("ami_vs_clusters", "per-run metrics in data/quality/by_run"); return
     for ds in C.DS_ORDER:
-        d = C.load_metrics(ds, bf=C.P.BF)
-        d = d[d.player.isin(list(C.QP)) & d.k.isin(KS)]
+        d = C.load_metrics(ds)
+        d = d[d.implementation.isin(list(C.QP)) & d.k.isin(KS)]
         if d.empty:
             continue
         refs = [r for r in REFS if d[r[0]].notna().any()]
         a = C.agg_seeds(d, ["clusters"] + [r[0] for r in refs])
         fig, axs = plt.subplots(1, len(refs), figsize=(C.FULLW * max(len(refs), 2) / 3, 1.9), squeeze=False)
         for ax, (col, lab) in zip(axs[0], refs):
-            for p in C.players_present(a):
-                s = a[a.player == p].sort_values("k")
+            for p in C.implementations_present(a):
+                s = a[a.implementation == p].sort_values("k")
                 s = s[s[col + "_mean"].notna()]
                 C.errbar(ax, s.clusters_mean / 1e3, s[col + "_mean"], s[col + "_min"], s[col + "_max"], p)
             ax.set_xlabel("clusters (thousands)")
